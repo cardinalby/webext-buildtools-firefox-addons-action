@@ -977,233 +977,232 @@ exports.colors = {
 /* 23 */,
 /* 24 */,
 /* 25 */
-/***/ (function(module, exports, __webpack_require__) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
+"use strict";
 
-/**
- * This is the common logic for both the Node.js and web browser
- * implementations of `debug()`.
- *
- * Expose `debug()` as the module.
- */
+module.exports = function(Promise,
+                          apiRejection,
+                          INTERNAL,
+                          tryConvertToPromise,
+                          Proxyable,
+                          debug) {
+var errors = __webpack_require__(607);
+var TypeError = errors.TypeError;
+var util = __webpack_require__(248);
+var errorObj = util.errorObj;
+var tryCatch = util.tryCatch;
+var yieldHandlers = [];
 
-exports = module.exports = createDebug.debug = createDebug['default'] = createDebug;
-exports.coerce = coerce;
-exports.disable = disable;
-exports.enable = enable;
-exports.enabled = enabled;
-exports.humanize = __webpack_require__(761);
-
-/**
- * Active `debug` instances.
- */
-exports.instances = [];
-
-/**
- * The currently active debug mode names, and names to skip.
- */
-
-exports.names = [];
-exports.skips = [];
-
-/**
- * Map of special "%n" handling functions, for the debug "format" argument.
- *
- * Valid key names are a single, lower or upper-case letter, i.e. "n" and "N".
- */
-
-exports.formatters = {};
-
-/**
- * Select a color.
- * @param {String} namespace
- * @return {Number}
- * @api private
- */
-
-function selectColor(namespace) {
-  var hash = 0, i;
-
-  for (i in namespace) {
-    hash  = ((hash << 5) - hash) + namespace.charCodeAt(i);
-    hash |= 0; // Convert to 32bit integer
-  }
-
-  return exports.colors[Math.abs(hash) % exports.colors.length];
-}
-
-/**
- * Create a debugger with the given `namespace`.
- *
- * @param {String} namespace
- * @return {Function}
- * @api public
- */
-
-function createDebug(namespace) {
-
-  var prevTime;
-
-  function debug() {
-    // disabled?
-    if (!debug.enabled) return;
-
-    var self = debug;
-
-    // set `diff` timestamp
-    var curr = +new Date();
-    var ms = curr - (prevTime || curr);
-    self.diff = ms;
-    self.prev = prevTime;
-    self.curr = curr;
-    prevTime = curr;
-
-    // turn the `arguments` into a proper Array
-    var args = new Array(arguments.length);
-    for (var i = 0; i < args.length; i++) {
-      args[i] = arguments[i];
+function promiseFromYieldHandler(value, yieldHandlers, traceParent) {
+    for (var i = 0; i < yieldHandlers.length; ++i) {
+        traceParent._pushContext();
+        var result = tryCatch(yieldHandlers[i])(value);
+        traceParent._popContext();
+        if (result === errorObj) {
+            traceParent._pushContext();
+            var ret = Promise.reject(errorObj.e);
+            traceParent._popContext();
+            return ret;
+        }
+        var maybePromise = tryConvertToPromise(result, traceParent);
+        if (maybePromise instanceof Promise) return maybePromise;
     }
-
-    args[0] = exports.coerce(args[0]);
-
-    if ('string' !== typeof args[0]) {
-      // anything else let's inspect with %O
-      args.unshift('%O');
-    }
-
-    // apply any `formatters` transformations
-    var index = 0;
-    args[0] = args[0].replace(/%([a-zA-Z%])/g, function(match, format) {
-      // if we encounter an escaped % then don't increase the array index
-      if (match === '%%') return match;
-      index++;
-      var formatter = exports.formatters[format];
-      if ('function' === typeof formatter) {
-        var val = args[index];
-        match = formatter.call(self, val);
-
-        // now we need to remove `args[index]` since it's inlined in the `format`
-        args.splice(index, 1);
-        index--;
-      }
-      return match;
-    });
-
-    // apply env-specific formatting (colors, etc.)
-    exports.formatArgs.call(self, args);
-
-    var logFn = debug.log || exports.log || console.log.bind(console);
-    logFn.apply(self, args);
-  }
-
-  debug.namespace = namespace;
-  debug.enabled = exports.enabled(namespace);
-  debug.useColors = exports.useColors();
-  debug.color = selectColor(namespace);
-  debug.destroy = destroy;
-
-  // env-specific initialization logic for debug instances
-  if ('function' === typeof exports.init) {
-    exports.init(debug);
-  }
-
-  exports.instances.push(debug);
-
-  return debug;
+    return null;
 }
 
-function destroy () {
-  var index = exports.instances.indexOf(this);
-  if (index !== -1) {
-    exports.instances.splice(index, 1);
-    return true;
-  } else {
-    return false;
-  }
-}
-
-/**
- * Enables a debug mode by namespaces. This can include modes
- * separated by a colon and wildcards.
- *
- * @param {String} namespaces
- * @api public
- */
-
-function enable(namespaces) {
-  exports.save(namespaces);
-
-  exports.names = [];
-  exports.skips = [];
-
-  var i;
-  var split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
-  var len = split.length;
-
-  for (i = 0; i < len; i++) {
-    if (!split[i]) continue; // ignore empty strings
-    namespaces = split[i].replace(/\*/g, '.*?');
-    if (namespaces[0] === '-') {
-      exports.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
+function PromiseSpawn(generatorFunction, receiver, yieldHandler, stack) {
+    if (debug.cancellation()) {
+        var internal = new Promise(INTERNAL);
+        var _finallyPromise = this._finallyPromise = new Promise(INTERNAL);
+        this._promise = internal.lastly(function() {
+            return _finallyPromise;
+        });
+        internal._captureStackTrace();
+        internal._setOnCancel(this);
     } else {
-      exports.names.push(new RegExp('^' + namespaces + '$'));
+        var promise = this._promise = new Promise(INTERNAL);
+        promise._captureStackTrace();
     }
-  }
-
-  for (i = 0; i < exports.instances.length; i++) {
-    var instance = exports.instances[i];
-    instance.enabled = exports.enabled(instance.namespace);
-  }
+    this._stack = stack;
+    this._generatorFunction = generatorFunction;
+    this._receiver = receiver;
+    this._generator = undefined;
+    this._yieldHandlers = typeof yieldHandler === "function"
+        ? [yieldHandler].concat(yieldHandlers)
+        : yieldHandlers;
+    this._yieldedPromise = null;
+    this._cancellationPhase = false;
 }
+util.inherits(PromiseSpawn, Proxyable);
 
-/**
- * Disable debug output.
- *
- * @api public
- */
+PromiseSpawn.prototype._isResolved = function() {
+    return this._promise === null;
+};
 
-function disable() {
-  exports.enable('');
-}
-
-/**
- * Returns true if the given mode name is enabled, false otherwise.
- *
- * @param {String} name
- * @return {Boolean}
- * @api public
- */
-
-function enabled(name) {
-  if (name[name.length - 1] === '*') {
-    return true;
-  }
-  var i, len;
-  for (i = 0, len = exports.skips.length; i < len; i++) {
-    if (exports.skips[i].test(name)) {
-      return false;
+PromiseSpawn.prototype._cleanup = function() {
+    this._promise = this._generator = null;
+    if (debug.cancellation() && this._finallyPromise !== null) {
+        this._finallyPromise._fulfill();
+        this._finallyPromise = null;
     }
-  }
-  for (i = 0, len = exports.names.length; i < len; i++) {
-    if (exports.names[i].test(name)) {
-      return true;
+};
+
+PromiseSpawn.prototype._promiseCancelled = function() {
+    if (this._isResolved()) return;
+    var implementsReturn = typeof this._generator["return"] !== "undefined";
+
+    var result;
+    if (!implementsReturn) {
+        var reason = new Promise.CancellationError(
+            "generator .return() sentinel");
+        Promise.coroutine.returnSentinel = reason;
+        this._promise._attachExtraTrace(reason);
+        this._promise._pushContext();
+        result = tryCatch(this._generator["throw"]).call(this._generator,
+                                                         reason);
+        this._promise._popContext();
+    } else {
+        this._promise._pushContext();
+        result = tryCatch(this._generator["return"]).call(this._generator,
+                                                          undefined);
+        this._promise._popContext();
     }
-  }
-  return false;
-}
+    this._cancellationPhase = true;
+    this._yieldedPromise = null;
+    this._continue(result);
+};
 
-/**
- * Coerce `val`.
- *
- * @param {Mixed} val
- * @return {Mixed}
- * @api private
- */
+PromiseSpawn.prototype._promiseFulfilled = function(value) {
+    this._yieldedPromise = null;
+    this._promise._pushContext();
+    var result = tryCatch(this._generator.next).call(this._generator, value);
+    this._promise._popContext();
+    this._continue(result);
+};
 
-function coerce(val) {
-  if (val instanceof Error) return val.stack || val.message;
-  return val;
-}
+PromiseSpawn.prototype._promiseRejected = function(reason) {
+    this._yieldedPromise = null;
+    this._promise._attachExtraTrace(reason);
+    this._promise._pushContext();
+    var result = tryCatch(this._generator["throw"])
+        .call(this._generator, reason);
+    this._promise._popContext();
+    this._continue(result);
+};
+
+PromiseSpawn.prototype._resultCancelled = function() {
+    if (this._yieldedPromise instanceof Promise) {
+        var promise = this._yieldedPromise;
+        this._yieldedPromise = null;
+        promise.cancel();
+    }
+};
+
+PromiseSpawn.prototype.promise = function () {
+    return this._promise;
+};
+
+PromiseSpawn.prototype._run = function () {
+    this._generator = this._generatorFunction.call(this._receiver);
+    this._receiver =
+        this._generatorFunction = undefined;
+    this._promiseFulfilled(undefined);
+};
+
+PromiseSpawn.prototype._continue = function (result) {
+    var promise = this._promise;
+    if (result === errorObj) {
+        this._cleanup();
+        if (this._cancellationPhase) {
+            return promise.cancel();
+        } else {
+            return promise._rejectCallback(result.e, false);
+        }
+    }
+
+    var value = result.value;
+    if (result.done === true) {
+        this._cleanup();
+        if (this._cancellationPhase) {
+            return promise.cancel();
+        } else {
+            return promise._resolveCallback(value);
+        }
+    } else {
+        var maybePromise = tryConvertToPromise(value, this._promise);
+        if (!(maybePromise instanceof Promise)) {
+            maybePromise =
+                promiseFromYieldHandler(maybePromise,
+                                        this._yieldHandlers,
+                                        this._promise);
+            if (maybePromise === null) {
+                this._promiseRejected(
+                    new TypeError(
+                        "A value %s was yielded that could not be treated as a promise\u000a\u000a    See http://goo.gl/MqrFmX\u000a\u000a".replace("%s", value) +
+                        "From coroutine:\u000a" +
+                        this._stack.split("\n").slice(1, -7).join("\n")
+                    )
+                );
+                return;
+            }
+        }
+        maybePromise = maybePromise._target();
+        var bitField = maybePromise._bitField;
+        ;
+        if (((bitField & 50397184) === 0)) {
+            this._yieldedPromise = maybePromise;
+            maybePromise._proxy(this, null);
+        } else if (((bitField & 33554432) !== 0)) {
+            Promise._async.invoke(
+                this._promiseFulfilled, this, maybePromise._value()
+            );
+        } else if (((bitField & 16777216) !== 0)) {
+            Promise._async.invoke(
+                this._promiseRejected, this, maybePromise._reason()
+            );
+        } else {
+            this._promiseCancelled();
+        }
+    }
+};
+
+Promise.coroutine = function (generatorFunction, options) {
+    if (typeof generatorFunction !== "function") {
+        throw new TypeError("generatorFunction must be a function\u000a\u000a    See http://goo.gl/MqrFmX\u000a");
+    }
+    var yieldHandler = Object(options).yieldHandler;
+    var PromiseSpawn$ = PromiseSpawn;
+    var stack = new Error().stack;
+    return function () {
+        var generator = generatorFunction.apply(this, arguments);
+        var spawn = new PromiseSpawn$(undefined, undefined, yieldHandler,
+                                      stack);
+        var ret = spawn.promise();
+        spawn._generator = generator;
+        spawn._promiseFulfilled(undefined);
+        return ret;
+    };
+};
+
+Promise.coroutine.addYieldHandler = function(fn) {
+    if (typeof fn !== "function") {
+        throw new TypeError("expecting a function but got " + util.classString(fn));
+    }
+    yieldHandlers.push(fn);
+};
+
+Promise.spawn = function (generatorFunction) {
+    debug.deprecated("Promise.spawn()", "Promise.coroutine()");
+    if (typeof generatorFunction !== "function") {
+        return apiRejection("generatorFunction must be a function\u000a\u000a    See http://goo.gl/MqrFmX\u000a");
+    }
+    var spawn = new PromiseSpawn(generatorFunction, this);
+    var ret = spawn.promise();
+    spawn._run(Promise.spawn);
+    return ret;
+};
+};
 
 
 /***/ }),
@@ -3774,7 +3773,7 @@ const os = __webpack_require__(87);
 const asyncForEach = __webpack_require__(915);
 const debug = __webpack_require__(698)('winston:rejection');
 const once = __webpack_require__(126);
-const stackTrace = __webpack_require__(817);
+const stackTrace = __webpack_require__(223);
 const ExceptionStream = __webpack_require__(369);
 
 /**
@@ -4729,47 +4728,41 @@ bufferEq.restore = function() {
 /* 81 */
 /***/ (function(module, exports, __webpack_require__) {
 
+"use strict";
+
+
 /**
  * Module dependencies.
  */
-
 var tty = __webpack_require__(867);
-var util = __webpack_require__(669);
 
+var util = __webpack_require__(669);
 /**
  * This is the Node.js implementation of `debug()`.
- *
- * Expose `debug()` as the module.
  */
 
-exports = module.exports = __webpack_require__(25);
+
 exports.init = init;
 exports.log = log;
 exports.formatArgs = formatArgs;
 exports.save = save;
 exports.load = load;
 exports.useColors = useColors;
-
 /**
  * Colors.
  */
 
-exports.colors = [ 6, 2, 3, 4, 5, 1 ];
+exports.colors = [6, 2, 3, 4, 5, 1];
 
 try {
+  // Optional dependency (as in, doesn't need to be installed, NOT like optionalDependencies in package.json)
+  // eslint-disable-next-line import/no-extraneous-dependencies
   var supportsColor = __webpack_require__(858);
-  if (supportsColor && supportsColor.level >= 2) {
-    exports.colors = [
-      20, 21, 26, 27, 32, 33, 38, 39, 40, 41, 42, 43, 44, 45, 56, 57, 62, 63, 68,
-      69, 74, 75, 76, 77, 78, 79, 80, 81, 92, 93, 98, 99, 112, 113, 128, 129, 134,
-      135, 148, 149, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171,
-      172, 173, 178, 179, 184, 185, 196, 197, 198, 199, 200, 201, 202, 203, 204,
-      205, 206, 207, 208, 209, 214, 215, 220, 221
-    ];
+
+  if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
+    exports.colors = [20, 21, 26, 27, 32, 33, 38, 39, 40, 41, 42, 43, 44, 45, 56, 57, 62, 63, 68, 69, 74, 75, 76, 77, 78, 79, 80, 81, 92, 93, 98, 99, 112, 113, 128, 129, 134, 135, 148, 149, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 178, 179, 184, 185, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 214, 215, 220, 221];
   }
-} catch (err) {
-  // swallow - we only care if `supports-color` is available; it doesn't have to be.
-}
+} catch (error) {} // Swallow - we only care if `supports-color` is available; it doesn't have to be.
 
 /**
  * Build up the default `inspectOpts` object from the environment variables.
@@ -4777,74 +4770,54 @@ try {
  *   $ DEBUG_COLORS=no DEBUG_DEPTH=10 DEBUG_SHOW_HIDDEN=enabled node script.js
  */
 
+
 exports.inspectOpts = Object.keys(process.env).filter(function (key) {
   return /^debug_/i.test(key);
 }).reduce(function (obj, key) {
-  // camel-case
-  var prop = key
-    .substring(6)
-    .toLowerCase()
-    .replace(/_([a-z])/g, function (_, k) { return k.toUpperCase() });
+  // Camel-case
+  var prop = key.substring(6).toLowerCase().replace(/_([a-z])/g, function (_, k) {
+    return k.toUpperCase();
+  }); // Coerce string value into JS value
 
-  // coerce string value into JS value
   var val = process.env[key];
-  if (/^(yes|on|true|enabled)$/i.test(val)) val = true;
-  else if (/^(no|off|false|disabled)$/i.test(val)) val = false;
-  else if (val === 'null') val = null;
-  else val = Number(val);
+
+  if (/^(yes|on|true|enabled)$/i.test(val)) {
+    val = true;
+  } else if (/^(no|off|false|disabled)$/i.test(val)) {
+    val = false;
+  } else if (val === 'null') {
+    val = null;
+  } else {
+    val = Number(val);
+  }
 
   obj[prop] = val;
   return obj;
 }, {});
-
 /**
  * Is stdout a TTY? Colored output is enabled when `true`.
  */
 
 function useColors() {
-  return 'colors' in exports.inspectOpts
-    ? Boolean(exports.inspectOpts.colors)
-    : tty.isatty(process.stderr.fd);
+  return 'colors' in exports.inspectOpts ? Boolean(exports.inspectOpts.colors) : tty.isatty(process.stderr.fd);
 }
-
-/**
- * Map %o to `util.inspect()`, all on a single line.
- */
-
-exports.formatters.o = function(v) {
-  this.inspectOpts.colors = this.useColors;
-  return util.inspect(v, this.inspectOpts)
-    .split('\n').map(function(str) {
-      return str.trim()
-    }).join(' ');
-};
-
-/**
- * Map %o to `util.inspect()`, allowing multiple lines if needed.
- */
-
-exports.formatters.O = function(v) {
-  this.inspectOpts.colors = this.useColors;
-  return util.inspect(v, this.inspectOpts);
-};
-
 /**
  * Adds ANSI color escape codes if enabled.
  *
  * @api public
  */
 
+
 function formatArgs(args) {
-  var name = this.namespace;
-  var useColors = this.useColors;
+  var name = this.namespace,
+      useColors = this.useColors;
 
   if (useColors) {
     var c = this.color;
-    var colorCode = '\u001b[3' + (c < 8 ? c : '8;5;' + c);
-    var prefix = '  ' + colorCode + ';1m' + name + ' ' + '\u001b[0m';
-
+    var colorCode = "\x1B[3" + (c < 8 ? c : '8;5;' + c);
+    var prefix = "  ".concat(colorCode, ";1m").concat(name, " \x1B[0m");
     args[0] = prefix + args[0].split('\n').join('\n' + prefix);
-    args.push(colorCode + 'm+' + exports.humanize(this.diff) + '\u001b[0m');
+    args.push(colorCode + 'm+' + module.exports.humanize(this.diff) + "\x1B[0m");
   } else {
     args[0] = getDate() + name + ' ' + args[0];
   }
@@ -4853,19 +4826,18 @@ function formatArgs(args) {
 function getDate() {
   if (exports.inspectOpts.hideDate) {
     return '';
-  } else {
-    return new Date().toISOString() + ' ';
   }
-}
 
+  return new Date().toISOString() + ' ';
+}
 /**
  * Invokes `util.format()` with the specified arguments and writes to stderr.
  */
 
+
 function log() {
   return process.stderr.write(util.format.apply(util, arguments) + '\n');
 }
-
 /**
  * Save `namespaces`.
  *
@@ -4873,16 +4845,16 @@ function log() {
  * @api private
  */
 
+
 function save(namespaces) {
-  if (null == namespaces) {
+  if (namespaces) {
+    process.env.DEBUG = namespaces;
+  } else {
     // If you set a process.env field to null or undefined, it gets cast to the
     // string 'null' or 'undefined'. Just delete instead.
     delete process.env.DEBUG;
-  } else {
-    process.env.DEBUG = namespaces;
   }
 }
-
 /**
  * Load `namespaces`.
  *
@@ -4890,10 +4862,10 @@ function save(namespaces) {
  * @api private
  */
 
+
 function load() {
   return process.env.DEBUG;
 }
-
 /**
  * Init logic for `debug` instances.
  *
@@ -4901,20 +4873,36 @@ function load() {
  * differently for a particular `debug` instance.
  */
 
-function init (debug) {
-  debug.inspectOpts = {};
 
+function init(debug) {
+  debug.inspectOpts = {};
   var keys = Object.keys(exports.inspectOpts);
+
   for (var i = 0; i < keys.length; i++) {
     debug.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
   }
 }
 
+module.exports = __webpack_require__(486)(exports);
+var formatters = module.exports.formatters;
 /**
- * Enable namespaces listed in `process.env.DEBUG` initially.
+ * Map %o to `util.inspect()`, all on a single line.
  */
 
-exports.enable(load());
+formatters.o = function (v) {
+  this.inspectOpts.colors = this.useColors;
+  return util.inspect(v, this.inspectOpts).replace(/\s*\n\s*/g, ' ');
+};
+/**
+ * Map %O to `util.inspect()`, allowing multiple lines if needed.
+ */
+
+
+formatters.O = function (v) {
+  this.inspectOpts.colors = this.useColors;
+  return util.inspect(v, this.inspectOpts);
+};
+
 
 
 /***/ }),
@@ -6472,7 +6460,7 @@ function __export(m) {
 Object.defineProperty(exports, "__esModule", { value: true });
 __export(__webpack_require__(92));
 __export(__webpack_require__(803));
-__export(__webpack_require__(486));
+__export(__webpack_require__(506));
 __export(__webpack_require__(625));
 __export(__webpack_require__(19));
 __export(__webpack_require__(604));
@@ -15349,170 +15337,144 @@ module.exports = {"$id":"browser.json#","$schema":"http://json-schema.org/draft-
 
 /***/ }),
 /* 223 */
-/***/ (function(module) {
+/***/ (function(__unusedmodule, exports) {
 
-/**
- * Helpers.
- */
+exports.get = function(belowFn) {
+  var oldLimit = Error.stackTraceLimit;
+  Error.stackTraceLimit = Infinity;
 
-var s = 1000;
-var m = s * 60;
-var h = m * 60;
-var d = h * 24;
-var w = d * 7;
-var y = d * 365.25;
+  var dummyObject = {};
 
-/**
- * Parse or format the given `val`.
- *
- * Options:
- *
- *  - `long` verbose formatting [false]
- *
- * @param {String|Number} val
- * @param {Object} [options]
- * @throws {Error} throw an error if val is not a non-empty string or a number
- * @return {String|Number}
- * @api public
- */
+  var v8Handler = Error.prepareStackTrace;
+  Error.prepareStackTrace = function(dummyObject, v8StackTrace) {
+    return v8StackTrace;
+  };
+  Error.captureStackTrace(dummyObject, belowFn || exports.get);
 
-module.exports = function(val, options) {
-  options = options || {};
-  var type = typeof val;
-  if (type === 'string' && val.length > 0) {
-    return parse(val);
-  } else if (type === 'number' && isFinite(val)) {
-    return options.long ? fmtLong(val) : fmtShort(val);
-  }
-  throw new Error(
-    'val is not a non-empty string or a valid number. val=' +
-      JSON.stringify(val)
-  );
+  var v8StackTrace = dummyObject.stack;
+  Error.prepareStackTrace = v8Handler;
+  Error.stackTraceLimit = oldLimit;
+
+  return v8StackTrace;
 };
 
-/**
- * Parse the given `str` and return milliseconds.
- *
- * @param {String} str
- * @return {Number}
- * @api private
- */
+exports.parse = function(err) {
+  if (!err.stack) {
+    return [];
+  }
 
-function parse(str) {
-  str = String(str);
-  if (str.length > 100) {
-    return;
-  }
-  var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
-    str
-  );
-  if (!match) {
-    return;
-  }
-  var n = parseFloat(match[1]);
-  var type = (match[2] || 'ms').toLowerCase();
-  switch (type) {
-    case 'years':
-    case 'year':
-    case 'yrs':
-    case 'yr':
-    case 'y':
-      return n * y;
-    case 'weeks':
-    case 'week':
-    case 'w':
-      return n * w;
-    case 'days':
-    case 'day':
-    case 'd':
-      return n * d;
-    case 'hours':
-    case 'hour':
-    case 'hrs':
-    case 'hr':
-    case 'h':
-      return n * h;
-    case 'minutes':
-    case 'minute':
-    case 'mins':
-    case 'min':
-    case 'm':
-      return n * m;
-    case 'seconds':
-    case 'second':
-    case 'secs':
-    case 'sec':
-    case 's':
-      return n * s;
-    case 'milliseconds':
-    case 'millisecond':
-    case 'msecs':
-    case 'msec':
-    case 'ms':
-      return n;
-    default:
-      return undefined;
+  var self = this;
+  var lines = err.stack.split('\n').slice(1);
+
+  return lines
+    .map(function(line) {
+      if (line.match(/^\s*[-]{4,}$/)) {
+        return self._createParsedCallSite({
+          fileName: line,
+          lineNumber: null,
+          functionName: null,
+          typeName: null,
+          methodName: null,
+          columnNumber: null,
+          'native': null,
+        });
+      }
+
+      var lineMatch = line.match(/at (?:(.+)\s+\()?(?:(.+?):(\d+)(?::(\d+))?|([^)]+))\)?/);
+      if (!lineMatch) {
+        return;
+      }
+
+      var object = null;
+      var method = null;
+      var functionName = null;
+      var typeName = null;
+      var methodName = null;
+      var isNative = (lineMatch[5] === 'native');
+
+      if (lineMatch[1]) {
+        functionName = lineMatch[1];
+        var methodStart = functionName.lastIndexOf('.');
+        if (functionName[methodStart-1] == '.')
+          methodStart--;
+        if (methodStart > 0) {
+          object = functionName.substr(0, methodStart);
+          method = functionName.substr(methodStart + 1);
+          var objectEnd = object.indexOf('.Module');
+          if (objectEnd > 0) {
+            functionName = functionName.substr(objectEnd + 1);
+            object = object.substr(0, objectEnd);
+          }
+        }
+        typeName = null;
+      }
+
+      if (method) {
+        typeName = object;
+        methodName = method;
+      }
+
+      if (method === '<anonymous>') {
+        methodName = null;
+        functionName = null;
+      }
+
+      var properties = {
+        fileName: lineMatch[2] || null,
+        lineNumber: parseInt(lineMatch[3], 10) || null,
+        functionName: functionName,
+        typeName: typeName,
+        methodName: methodName,
+        columnNumber: parseInt(lineMatch[4], 10) || null,
+        'native': isNative,
+      };
+
+      return self._createParsedCallSite(properties);
+    })
+    .filter(function(callSite) {
+      return !!callSite;
+    });
+};
+
+function CallSite(properties) {
+  for (var property in properties) {
+    this[property] = properties[property];
   }
 }
 
-/**
- * Short format for `ms`.
- *
- * @param {Number} ms
- * @return {String}
- * @api private
- */
+var strProperties = [
+  'this',
+  'typeName',
+  'functionName',
+  'methodName',
+  'fileName',
+  'lineNumber',
+  'columnNumber',
+  'function',
+  'evalOrigin'
+];
+var boolProperties = [
+  'topLevel',
+  'eval',
+  'native',
+  'constructor'
+];
+strProperties.forEach(function (property) {
+  CallSite.prototype[property] = null;
+  CallSite.prototype['get' + property[0].toUpperCase() + property.substr(1)] = function () {
+    return this[property];
+  }
+});
+boolProperties.forEach(function (property) {
+  CallSite.prototype[property] = false;
+  CallSite.prototype['is' + property[0].toUpperCase() + property.substr(1)] = function () {
+    return this[property];
+  }
+});
 
-function fmtShort(ms) {
-  var msAbs = Math.abs(ms);
-  if (msAbs >= d) {
-    return Math.round(ms / d) + 'd';
-  }
-  if (msAbs >= h) {
-    return Math.round(ms / h) + 'h';
-  }
-  if (msAbs >= m) {
-    return Math.round(ms / m) + 'm';
-  }
-  if (msAbs >= s) {
-    return Math.round(ms / s) + 's';
-  }
-  return ms + 'ms';
-}
-
-/**
- * Long format for `ms`.
- *
- * @param {Number} ms
- * @return {String}
- * @api private
- */
-
-function fmtLong(ms) {
-  var msAbs = Math.abs(ms);
-  if (msAbs >= d) {
-    return plural(ms, msAbs, d, 'day');
-  }
-  if (msAbs >= h) {
-    return plural(ms, msAbs, h, 'hour');
-  }
-  if (msAbs >= m) {
-    return plural(ms, msAbs, m, 'minute');
-  }
-  if (msAbs >= s) {
-    return plural(ms, msAbs, s, 'second');
-  }
-  return ms + ' ms';
-}
-
-/**
- * Pluralization helper.
- */
-
-function plural(ms, msAbs, n, name) {
-  var isPlural = msAbs >= n * 1.5;
-  return Math.round(ms / n) + ' ' + name + (isPlural ? 's' : '');
-}
+exports._createParsedCallSite = function(properties) {
+  return new CallSite(properties);
+};
 
 
 /***/ }),
@@ -28675,7 +28637,7 @@ const os = __webpack_require__(87);
 const asyncForEach = __webpack_require__(915);
 const debug = __webpack_require__(698)('winston:exception');
 const once = __webpack_require__(126);
-const stackTrace = __webpack_require__(817);
+const stackTrace = __webpack_require__(223);
 const ExceptionStream = __webpack_require__(369);
 
 /**
@@ -46152,213 +46114,7 @@ exports.unzip = (req, res) => {
 
 
 /***/ }),
-/* 481 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-// a transform stream is a readable/writable stream where you do
-// something with the data.  Sometimes it's called a "filter",
-// but that's not a great name for it, since that implies a thing where
-// some bits pass through, and others are simply ignored.  (That would
-// be a valid example of a transform, of course.)
-//
-// While the output is causally related to the input, it's not a
-// necessarily symmetric or synchronous transformation.  For example,
-// a zlib stream might take multiple plain-text writes(), and then
-// emit a single compressed chunk some time in the future.
-//
-// Here's how this works:
-//
-// The Transform stream has all the aspects of the readable and writable
-// stream classes.  When you write(chunk), that calls _write(chunk,cb)
-// internally, and returns false if there's a lot of pending writes
-// buffered up.  When you call read(), that calls _read(n) until
-// there's enough pending readable data buffered up.
-//
-// In a transform stream, the written data is placed in a buffer.  When
-// _read(n) is called, it transforms the queued up data, calling the
-// buffered _write cb's as it consumes chunks.  If consuming a single
-// written chunk would result in multiple output chunks, then the first
-// outputted bit calls the readcb, and subsequent chunks just go into
-// the read buffer, and will cause it to emit 'readable' if necessary.
-//
-// This way, back-pressure is actually determined by the reading side,
-// since _read has to be called to start processing a new chunk.  However,
-// a pathological inflate type of transform can cause excessive buffering
-// here.  For example, imagine a stream where every byte of input is
-// interpreted as an integer from 0-255, and then results in that many
-// bytes of output.  Writing the 4 bytes {ff,ff,ff,ff} would result in
-// 1kb of data being output.  In this case, you could write a very small
-// amount of input, and end up with a very large amount of output.  In
-// such a pathological inflating mechanism, there'd be no way to tell
-// the system to stop doing the transform.  A single 4MB write could
-// cause the system to run out of memory.
-//
-// However, even in such a pathological case, only a single written chunk
-// would be consumed, and then the rest would wait (un-transformed) until
-// the results of the previous transformed chunk were consumed.
-
-
-module.exports = Transform;
-
-var _require$codes = __webpack_require__(38).codes,
-    ERR_METHOD_NOT_IMPLEMENTED = _require$codes.ERR_METHOD_NOT_IMPLEMENTED,
-    ERR_MULTIPLE_CALLBACK = _require$codes.ERR_MULTIPLE_CALLBACK,
-    ERR_TRANSFORM_ALREADY_TRANSFORMING = _require$codes.ERR_TRANSFORM_ALREADY_TRANSFORMING,
-    ERR_TRANSFORM_WITH_LENGTH_0 = _require$codes.ERR_TRANSFORM_WITH_LENGTH_0;
-
-var Duplex = __webpack_require__(831);
-
-__webpack_require__(689)(Transform, Duplex);
-
-function afterTransform(er, data) {
-  var ts = this._transformState;
-  ts.transforming = false;
-  var cb = ts.writecb;
-
-  if (cb === null) {
-    return this.emit('error', new ERR_MULTIPLE_CALLBACK());
-  }
-
-  ts.writechunk = null;
-  ts.writecb = null;
-  if (data != null) // single equals check for both `null` and `undefined`
-    this.push(data);
-  cb(er);
-  var rs = this._readableState;
-  rs.reading = false;
-
-  if (rs.needReadable || rs.length < rs.highWaterMark) {
-    this._read(rs.highWaterMark);
-  }
-}
-
-function Transform(options) {
-  if (!(this instanceof Transform)) return new Transform(options);
-  Duplex.call(this, options);
-  this._transformState = {
-    afterTransform: afterTransform.bind(this),
-    needTransform: false,
-    transforming: false,
-    writecb: null,
-    writechunk: null,
-    writeencoding: null
-  }; // start out asking for a readable event once data is transformed.
-
-  this._readableState.needReadable = true; // we have implemented the _read method, and done the other things
-  // that Readable wants before the first _read call, so unset the
-  // sync guard flag.
-
-  this._readableState.sync = false;
-
-  if (options) {
-    if (typeof options.transform === 'function') this._transform = options.transform;
-    if (typeof options.flush === 'function') this._flush = options.flush;
-  } // When the writable side finishes, then flush out anything remaining.
-
-
-  this.on('prefinish', prefinish);
-}
-
-function prefinish() {
-  var _this = this;
-
-  if (typeof this._flush === 'function' && !this._readableState.destroyed) {
-    this._flush(function (er, data) {
-      done(_this, er, data);
-    });
-  } else {
-    done(this, null, null);
-  }
-}
-
-Transform.prototype.push = function (chunk, encoding) {
-  this._transformState.needTransform = false;
-  return Duplex.prototype.push.call(this, chunk, encoding);
-}; // This is the part where you do stuff!
-// override this function in implementation classes.
-// 'chunk' is an input chunk.
-//
-// Call `push(newChunk)` to pass along transformed output
-// to the readable side.  You may call 'push' zero or more times.
-//
-// Call `cb(err)` when you are done with this chunk.  If you pass
-// an error, then that'll put the hurt on the whole operation.  If you
-// never call cb(), then you'll never get another chunk.
-
-
-Transform.prototype._transform = function (chunk, encoding, cb) {
-  cb(new ERR_METHOD_NOT_IMPLEMENTED('_transform()'));
-};
-
-Transform.prototype._write = function (chunk, encoding, cb) {
-  var ts = this._transformState;
-  ts.writecb = cb;
-  ts.writechunk = chunk;
-  ts.writeencoding = encoding;
-
-  if (!ts.transforming) {
-    var rs = this._readableState;
-    if (ts.needTransform || rs.needReadable || rs.length < rs.highWaterMark) this._read(rs.highWaterMark);
-  }
-}; // Doesn't matter what the args are here.
-// _transform does all the work.
-// That we got here means that the readable side wants more data.
-
-
-Transform.prototype._read = function (n) {
-  var ts = this._transformState;
-
-  if (ts.writechunk !== null && !ts.transforming) {
-    ts.transforming = true;
-
-    this._transform(ts.writechunk, ts.writeencoding, ts.afterTransform);
-  } else {
-    // mark that we need a transform, so that any data that comes in
-    // will get processed, now that we've asked for it.
-    ts.needTransform = true;
-  }
-};
-
-Transform.prototype._destroy = function (err, cb) {
-  Duplex.prototype._destroy.call(this, err, function (err2) {
-    cb(err2);
-  });
-};
-
-function done(stream, er, data) {
-  if (er) return stream.emit('error', er);
-  if (data != null) // single equals check for both `null` and `undefined`
-    stream.push(data); // TODO(BridgeAR): Write a test for these two error cases
-  // if there's nothing in the write buffer, then that means
-  // that nothing more will ever be provided
-
-  if (stream._writableState.length) throw new ERR_TRANSFORM_WITH_LENGTH_0();
-  if (stream._transformState.transforming) throw new ERR_TRANSFORM_ALREADY_TRANSFORMING();
-  return stream.push(null);
-}
-
-/***/ }),
+/* 481 */,
 /* 482 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -47209,40 +46965,259 @@ Writable.prototype._destroy = function (err, cb) {
 /***/ }),
 /* 485 */,
 /* 486 */
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
 
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const _ = __importStar(__webpack_require__(557));
-// noinspection JSUnusedGlobalSymbols
-function logMethodProxy(logMethod, options) {
-    return (level, message, ...meta) => {
-        if (_.isObject(options.levelsMap) && options.levelsMap[level] !== undefined) {
-            const mappedLevel = options.levelsMap[level];
-            if (mappedLevel === null) {
-                return;
-            }
-            level = mappedLevel;
+
+/**
+ * This is the common logic for both the Node.js and web browser
+ * implementations of `debug()`.
+ */
+function setup(env) {
+  createDebug.debug = createDebug;
+  createDebug.default = createDebug;
+  createDebug.coerce = coerce;
+  createDebug.disable = disable;
+  createDebug.enable = enable;
+  createDebug.enabled = enabled;
+  createDebug.humanize = __webpack_require__(761);
+  Object.keys(env).forEach(function (key) {
+    createDebug[key] = env[key];
+  });
+  /**
+  * Active `debug` instances.
+  */
+
+  createDebug.instances = [];
+  /**
+  * The currently active debug mode names, and names to skip.
+  */
+
+  createDebug.names = [];
+  createDebug.skips = [];
+  /**
+  * Map of special "%n" handling functions, for the debug "format" argument.
+  *
+  * Valid key names are a single, lower or upper-case letter, i.e. "n" and "N".
+  */
+
+  createDebug.formatters = {};
+  /**
+  * Selects a color for a debug namespace
+  * @param {String} namespace The namespace string for the for the debug instance to be colored
+  * @return {Number|String} An ANSI color code for the given namespace
+  * @api private
+  */
+
+  function selectColor(namespace) {
+    var hash = 0;
+
+    for (var i = 0; i < namespace.length; i++) {
+      hash = (hash << 5) - hash + namespace.charCodeAt(i);
+      hash |= 0; // Convert to 32bit integer
+    }
+
+    return createDebug.colors[Math.abs(hash) % createDebug.colors.length];
+  }
+
+  createDebug.selectColor = selectColor;
+  /**
+  * Create a debugger with the given `namespace`.
+  *
+  * @param {String} namespace
+  * @return {Function}
+  * @api public
+  */
+
+  function createDebug(namespace) {
+    var prevTime;
+
+    function debug() {
+      // Disabled?
+      if (!debug.enabled) {
+        return;
+      }
+
+      for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+        args[_key] = arguments[_key];
+      }
+
+      var self = debug; // Set `diff` timestamp
+
+      var curr = Number(new Date());
+      var ms = curr - (prevTime || curr);
+      self.diff = ms;
+      self.prev = prevTime;
+      self.curr = curr;
+      prevTime = curr;
+      args[0] = createDebug.coerce(args[0]);
+
+      if (typeof args[0] !== 'string') {
+        // Anything else let's inspect with %O
+        args.unshift('%O');
+      } // Apply any `formatters` transformations
+
+
+      var index = 0;
+      args[0] = args[0].replace(/%([a-zA-Z%])/g, function (match, format) {
+        // If we encounter an escaped % then don't increase the array index
+        if (match === '%%') {
+          return match;
         }
-        if (options.msgPrefix) {
-            message = options.msgPrefix + message;
+
+        index++;
+        var formatter = createDebug.formatters[format];
+
+        if (typeof formatter === 'function') {
+          var val = args[index];
+          match = formatter.call(self, val); // Now we need to remove `args[index]` since it's inlined in the `format`
+
+          args.splice(index, 1);
+          index--;
         }
-        if (options.msgSuffix) {
-            message = message + options.msgSuffix;
-        }
-        logMethod(level, message, ...meta);
-    };
+
+        return match;
+      }); // Apply env-specific formatting (colors, etc.)
+
+      createDebug.formatArgs.call(self, args);
+      var logFn = self.log || createDebug.log;
+      logFn.apply(self, args);
+    }
+
+    debug.namespace = namespace;
+    debug.enabled = createDebug.enabled(namespace);
+    debug.useColors = createDebug.useColors();
+    debug.color = selectColor(namespace);
+    debug.destroy = destroy;
+    debug.extend = extend; // Debug.formatArgs = formatArgs;
+    // debug.rawLog = rawLog;
+    // env-specific initialization logic for debug instances
+
+    if (typeof createDebug.init === 'function') {
+      createDebug.init(debug);
+    }
+
+    createDebug.instances.push(debug);
+    return debug;
+  }
+
+  function destroy() {
+    var index = createDebug.instances.indexOf(this);
+
+    if (index !== -1) {
+      createDebug.instances.splice(index, 1);
+      return true;
+    }
+
+    return false;
+  }
+
+  function extend(namespace, delimiter) {
+    return createDebug(this.namespace + (typeof delimiter === 'undefined' ? ':' : delimiter) + namespace);
+  }
+  /**
+  * Enables a debug mode by namespaces. This can include modes
+  * separated by a colon and wildcards.
+  *
+  * @param {String} namespaces
+  * @api public
+  */
+
+
+  function enable(namespaces) {
+    createDebug.save(namespaces);
+    createDebug.names = [];
+    createDebug.skips = [];
+    var i;
+    var split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
+    var len = split.length;
+
+    for (i = 0; i < len; i++) {
+      if (!split[i]) {
+        // ignore empty strings
+        continue;
+      }
+
+      namespaces = split[i].replace(/\*/g, '.*?');
+
+      if (namespaces[0] === '-') {
+        createDebug.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
+      } else {
+        createDebug.names.push(new RegExp('^' + namespaces + '$'));
+      }
+    }
+
+    for (i = 0; i < createDebug.instances.length; i++) {
+      var instance = createDebug.instances[i];
+      instance.enabled = createDebug.enabled(instance.namespace);
+    }
+  }
+  /**
+  * Disable debug output.
+  *
+  * @api public
+  */
+
+
+  function disable() {
+    createDebug.enable('');
+  }
+  /**
+  * Returns true if the given mode name is enabled, false otherwise.
+  *
+  * @param {String} name
+  * @return {Boolean}
+  * @api public
+  */
+
+
+  function enabled(name) {
+    if (name[name.length - 1] === '*') {
+      return true;
+    }
+
+    var i;
+    var len;
+
+    for (i = 0, len = createDebug.skips.length; i < len; i++) {
+      if (createDebug.skips[i].test(name)) {
+        return false;
+      }
+    }
+
+    for (i = 0, len = createDebug.names.length; i < len; i++) {
+      if (createDebug.names[i].test(name)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+  /**
+  * Coerce `val`.
+  *
+  * @param {Mixed} val
+  * @return {Mixed}
+  * @api private
+  */
+
+
+  function coerce(val) {
+    if (val instanceof Error) {
+      return val.stack || val.message;
+    }
+
+    return val;
+  }
+
+  createDebug.enable(createDebug.load());
+  return createDebug;
 }
-exports.logMethodProxy = logMethodProxy;
-//# sourceMappingURL=logMethodProxy.js.map
+
+module.exports = setup;
+
+
 
 /***/ }),
 /* 487 */,
@@ -48694,7 +48669,43 @@ function asyncEachOfLimit(generator, limit, iteratee, callback) {
 module.exports = exports['default'];
 
 /***/ }),
-/* 506 */,
+/* 506 */
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const _ = __importStar(__webpack_require__(557));
+// noinspection JSUnusedGlobalSymbols
+function logMethodProxy(logMethod, options) {
+    return (level, message, ...meta) => {
+        if (_.isObject(options.levelsMap) && options.levelsMap[level] !== undefined) {
+            const mappedLevel = options.levelsMap[level];
+            if (mappedLevel === null) {
+                return;
+            }
+            level = mappedLevel;
+        }
+        if (options.msgPrefix) {
+            message = options.msgPrefix + message;
+        }
+        if (options.msgSuffix) {
+            message = message + options.msgSuffix;
+        }
+        logMethod(level, message, ...meta);
+    };
+}
+exports.logMethodProxy = logMethodProxy;
+//# sourceMappingURL=logMethodProxy.js.map
+
+/***/ }),
 /* 507 */,
 /* 508 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -51099,230 +51110,207 @@ SocketReader.prototype._read = function () {
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+// a transform stream is a readable/writable stream where you do
+// something with the data.  Sometimes it's called a "filter",
+// but that's not a great name for it, since that implies a thing where
+// some bits pass through, and others are simply ignored.  (That would
+// be a valid example of a transform, of course.)
+//
+// While the output is causally related to the input, it's not a
+// necessarily symmetric or synchronous transformation.  For example,
+// a zlib stream might take multiple plain-text writes(), and then
+// emit a single compressed chunk some time in the future.
+//
+// Here's how this works:
+//
+// The Transform stream has all the aspects of the readable and writable
+// stream classes.  When you write(chunk), that calls _write(chunk,cb)
+// internally, and returns false if there's a lot of pending writes
+// buffered up.  When you call read(), that calls _read(n) until
+// there's enough pending readable data buffered up.
+//
+// In a transform stream, the written data is placed in a buffer.  When
+// _read(n) is called, it transforms the queued up data, calling the
+// buffered _write cb's as it consumes chunks.  If consuming a single
+// written chunk would result in multiple output chunks, then the first
+// outputted bit calls the readcb, and subsequent chunks just go into
+// the read buffer, and will cause it to emit 'readable' if necessary.
+//
+// This way, back-pressure is actually determined by the reading side,
+// since _read has to be called to start processing a new chunk.  However,
+// a pathological inflate type of transform can cause excessive buffering
+// here.  For example, imagine a stream where every byte of input is
+// interpreted as an integer from 0-255, and then results in that many
+// bytes of output.  Writing the 4 bytes {ff,ff,ff,ff} would result in
+// 1kb of data being output.  In this case, you could write a very small
+// amount of input, and end up with a very large amount of output.  In
+// such a pathological inflating mechanism, there'd be no way to tell
+// the system to stop doing the transform.  A single 4MB write could
+// cause the system to run out of memory.
+//
+// However, even in such a pathological case, only a single written chunk
+// would be consumed, and then the rest would wait (un-transformed) until
+// the results of the previous transformed chunk were consumed.
 
-module.exports = function(Promise,
-                          apiRejection,
-                          INTERNAL,
-                          tryConvertToPromise,
-                          Proxyable,
-                          debug) {
-var errors = __webpack_require__(607);
-var TypeError = errors.TypeError;
-var util = __webpack_require__(248);
-var errorObj = util.errorObj;
-var tryCatch = util.tryCatch;
-var yieldHandlers = [];
 
-function promiseFromYieldHandler(value, yieldHandlers, traceParent) {
-    for (var i = 0; i < yieldHandlers.length; ++i) {
-        traceParent._pushContext();
-        var result = tryCatch(yieldHandlers[i])(value);
-        traceParent._popContext();
-        if (result === errorObj) {
-            traceParent._pushContext();
-            var ret = Promise.reject(errorObj.e);
-            traceParent._popContext();
-            return ret;
-        }
-        var maybePromise = tryConvertToPromise(result, traceParent);
-        if (maybePromise instanceof Promise) return maybePromise;
-    }
-    return null;
+module.exports = Transform;
+
+var _require$codes = __webpack_require__(38).codes,
+    ERR_METHOD_NOT_IMPLEMENTED = _require$codes.ERR_METHOD_NOT_IMPLEMENTED,
+    ERR_MULTIPLE_CALLBACK = _require$codes.ERR_MULTIPLE_CALLBACK,
+    ERR_TRANSFORM_ALREADY_TRANSFORMING = _require$codes.ERR_TRANSFORM_ALREADY_TRANSFORMING,
+    ERR_TRANSFORM_WITH_LENGTH_0 = _require$codes.ERR_TRANSFORM_WITH_LENGTH_0;
+
+var Duplex = __webpack_require__(831);
+
+__webpack_require__(689)(Transform, Duplex);
+
+function afterTransform(er, data) {
+  var ts = this._transformState;
+  ts.transforming = false;
+  var cb = ts.writecb;
+
+  if (cb === null) {
+    return this.emit('error', new ERR_MULTIPLE_CALLBACK());
+  }
+
+  ts.writechunk = null;
+  ts.writecb = null;
+  if (data != null) // single equals check for both `null` and `undefined`
+    this.push(data);
+  cb(er);
+  var rs = this._readableState;
+  rs.reading = false;
+
+  if (rs.needReadable || rs.length < rs.highWaterMark) {
+    this._read(rs.highWaterMark);
+  }
 }
 
-function PromiseSpawn(generatorFunction, receiver, yieldHandler, stack) {
-    if (debug.cancellation()) {
-        var internal = new Promise(INTERNAL);
-        var _finallyPromise = this._finallyPromise = new Promise(INTERNAL);
-        this._promise = internal.lastly(function() {
-            return _finallyPromise;
-        });
-        internal._captureStackTrace();
-        internal._setOnCancel(this);
-    } else {
-        var promise = this._promise = new Promise(INTERNAL);
-        promise._captureStackTrace();
-    }
-    this._stack = stack;
-    this._generatorFunction = generatorFunction;
-    this._receiver = receiver;
-    this._generator = undefined;
-    this._yieldHandlers = typeof yieldHandler === "function"
-        ? [yieldHandler].concat(yieldHandlers)
-        : yieldHandlers;
-    this._yieldedPromise = null;
-    this._cancellationPhase = false;
+function Transform(options) {
+  if (!(this instanceof Transform)) return new Transform(options);
+  Duplex.call(this, options);
+  this._transformState = {
+    afterTransform: afterTransform.bind(this),
+    needTransform: false,
+    transforming: false,
+    writecb: null,
+    writechunk: null,
+    writeencoding: null
+  }; // start out asking for a readable event once data is transformed.
+
+  this._readableState.needReadable = true; // we have implemented the _read method, and done the other things
+  // that Readable wants before the first _read call, so unset the
+  // sync guard flag.
+
+  this._readableState.sync = false;
+
+  if (options) {
+    if (typeof options.transform === 'function') this._transform = options.transform;
+    if (typeof options.flush === 'function') this._flush = options.flush;
+  } // When the writable side finishes, then flush out anything remaining.
+
+
+  this.on('prefinish', prefinish);
 }
-util.inherits(PromiseSpawn, Proxyable);
 
-PromiseSpawn.prototype._isResolved = function() {
-    return this._promise === null;
+function prefinish() {
+  var _this = this;
+
+  if (typeof this._flush === 'function' && !this._readableState.destroyed) {
+    this._flush(function (er, data) {
+      done(_this, er, data);
+    });
+  } else {
+    done(this, null, null);
+  }
+}
+
+Transform.prototype.push = function (chunk, encoding) {
+  this._transformState.needTransform = false;
+  return Duplex.prototype.push.call(this, chunk, encoding);
+}; // This is the part where you do stuff!
+// override this function in implementation classes.
+// 'chunk' is an input chunk.
+//
+// Call `push(newChunk)` to pass along transformed output
+// to the readable side.  You may call 'push' zero or more times.
+//
+// Call `cb(err)` when you are done with this chunk.  If you pass
+// an error, then that'll put the hurt on the whole operation.  If you
+// never call cb(), then you'll never get another chunk.
+
+
+Transform.prototype._transform = function (chunk, encoding, cb) {
+  cb(new ERR_METHOD_NOT_IMPLEMENTED('_transform()'));
 };
 
-PromiseSpawn.prototype._cleanup = function() {
-    this._promise = this._generator = null;
-    if (debug.cancellation() && this._finallyPromise !== null) {
-        this._finallyPromise._fulfill();
-        this._finallyPromise = null;
-    }
+Transform.prototype._write = function (chunk, encoding, cb) {
+  var ts = this._transformState;
+  ts.writecb = cb;
+  ts.writechunk = chunk;
+  ts.writeencoding = encoding;
+
+  if (!ts.transforming) {
+    var rs = this._readableState;
+    if (ts.needTransform || rs.needReadable || rs.length < rs.highWaterMark) this._read(rs.highWaterMark);
+  }
+}; // Doesn't matter what the args are here.
+// _transform does all the work.
+// That we got here means that the readable side wants more data.
+
+
+Transform.prototype._read = function (n) {
+  var ts = this._transformState;
+
+  if (ts.writechunk !== null && !ts.transforming) {
+    ts.transforming = true;
+
+    this._transform(ts.writechunk, ts.writeencoding, ts.afterTransform);
+  } else {
+    // mark that we need a transform, so that any data that comes in
+    // will get processed, now that we've asked for it.
+    ts.needTransform = true;
+  }
 };
 
-PromiseSpawn.prototype._promiseCancelled = function() {
-    if (this._isResolved()) return;
-    var implementsReturn = typeof this._generator["return"] !== "undefined";
-
-    var result;
-    if (!implementsReturn) {
-        var reason = new Promise.CancellationError(
-            "generator .return() sentinel");
-        Promise.coroutine.returnSentinel = reason;
-        this._promise._attachExtraTrace(reason);
-        this._promise._pushContext();
-        result = tryCatch(this._generator["throw"]).call(this._generator,
-                                                         reason);
-        this._promise._popContext();
-    } else {
-        this._promise._pushContext();
-        result = tryCatch(this._generator["return"]).call(this._generator,
-                                                          undefined);
-        this._promise._popContext();
-    }
-    this._cancellationPhase = true;
-    this._yieldedPromise = null;
-    this._continue(result);
+Transform.prototype._destroy = function (err, cb) {
+  Duplex.prototype._destroy.call(this, err, function (err2) {
+    cb(err2);
+  });
 };
 
-PromiseSpawn.prototype._promiseFulfilled = function(value) {
-    this._yieldedPromise = null;
-    this._promise._pushContext();
-    var result = tryCatch(this._generator.next).call(this._generator, value);
-    this._promise._popContext();
-    this._continue(result);
-};
+function done(stream, er, data) {
+  if (er) return stream.emit('error', er);
+  if (data != null) // single equals check for both `null` and `undefined`
+    stream.push(data); // TODO(BridgeAR): Write a test for these two error cases
+  // if there's nothing in the write buffer, then that means
+  // that nothing more will ever be provided
 
-PromiseSpawn.prototype._promiseRejected = function(reason) {
-    this._yieldedPromise = null;
-    this._promise._attachExtraTrace(reason);
-    this._promise._pushContext();
-    var result = tryCatch(this._generator["throw"])
-        .call(this._generator, reason);
-    this._promise._popContext();
-    this._continue(result);
-};
-
-PromiseSpawn.prototype._resultCancelled = function() {
-    if (this._yieldedPromise instanceof Promise) {
-        var promise = this._yieldedPromise;
-        this._yieldedPromise = null;
-        promise.cancel();
-    }
-};
-
-PromiseSpawn.prototype.promise = function () {
-    return this._promise;
-};
-
-PromiseSpawn.prototype._run = function () {
-    this._generator = this._generatorFunction.call(this._receiver);
-    this._receiver =
-        this._generatorFunction = undefined;
-    this._promiseFulfilled(undefined);
-};
-
-PromiseSpawn.prototype._continue = function (result) {
-    var promise = this._promise;
-    if (result === errorObj) {
-        this._cleanup();
-        if (this._cancellationPhase) {
-            return promise.cancel();
-        } else {
-            return promise._rejectCallback(result.e, false);
-        }
-    }
-
-    var value = result.value;
-    if (result.done === true) {
-        this._cleanup();
-        if (this._cancellationPhase) {
-            return promise.cancel();
-        } else {
-            return promise._resolveCallback(value);
-        }
-    } else {
-        var maybePromise = tryConvertToPromise(value, this._promise);
-        if (!(maybePromise instanceof Promise)) {
-            maybePromise =
-                promiseFromYieldHandler(maybePromise,
-                                        this._yieldHandlers,
-                                        this._promise);
-            if (maybePromise === null) {
-                this._promiseRejected(
-                    new TypeError(
-                        "A value %s was yielded that could not be treated as a promise\u000a\u000a    See http://goo.gl/MqrFmX\u000a\u000a".replace("%s", value) +
-                        "From coroutine:\u000a" +
-                        this._stack.split("\n").slice(1, -7).join("\n")
-                    )
-                );
-                return;
-            }
-        }
-        maybePromise = maybePromise._target();
-        var bitField = maybePromise._bitField;
-        ;
-        if (((bitField & 50397184) === 0)) {
-            this._yieldedPromise = maybePromise;
-            maybePromise._proxy(this, null);
-        } else if (((bitField & 33554432) !== 0)) {
-            Promise._async.invoke(
-                this._promiseFulfilled, this, maybePromise._value()
-            );
-        } else if (((bitField & 16777216) !== 0)) {
-            Promise._async.invoke(
-                this._promiseRejected, this, maybePromise._reason()
-            );
-        } else {
-            this._promiseCancelled();
-        }
-    }
-};
-
-Promise.coroutine = function (generatorFunction, options) {
-    if (typeof generatorFunction !== "function") {
-        throw new TypeError("generatorFunction must be a function\u000a\u000a    See http://goo.gl/MqrFmX\u000a");
-    }
-    var yieldHandler = Object(options).yieldHandler;
-    var PromiseSpawn$ = PromiseSpawn;
-    var stack = new Error().stack;
-    return function () {
-        var generator = generatorFunction.apply(this, arguments);
-        var spawn = new PromiseSpawn$(undefined, undefined, yieldHandler,
-                                      stack);
-        var ret = spawn.promise();
-        spawn._generator = generator;
-        spawn._promiseFulfilled(undefined);
-        return ret;
-    };
-};
-
-Promise.coroutine.addYieldHandler = function(fn) {
-    if (typeof fn !== "function") {
-        throw new TypeError("expecting a function but got " + util.classString(fn));
-    }
-    yieldHandlers.push(fn);
-};
-
-Promise.spawn = function (generatorFunction) {
-    debug.deprecated("Promise.spawn()", "Promise.coroutine()");
-    if (typeof generatorFunction !== "function") {
-        return apiRejection("generatorFunction must be a function\u000a\u000a    See http://goo.gl/MqrFmX\u000a");
-    }
-    var spawn = new PromiseSpawn(generatorFunction, this);
-    var ret = spawn.promise();
-    spawn._run(Promise.spawn);
-    return ret;
-};
-};
-
+  if (stream._writableState.length) throw new ERR_TRANSFORM_WITH_LENGTH_0();
+  if (stream._transformState.transforming) throw new ERR_TRANSFORM_ALREADY_TRANSFORMING();
+  return stream.push(null);
+}
 
 /***/ }),
 /* 529 */,
@@ -52883,7 +52871,7 @@ module.exports = (options, iter) => {
 /* 546 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-var ms = __webpack_require__(223);
+var ms = __webpack_require__(761);
 
 module.exports = function (time, iat) {
   var timestamp = iat || Math.floor(Date.now() / 1000);
@@ -86737,6 +86725,7 @@ var s = 1000;
 var m = s * 60;
 var h = m * 60;
 var d = h * 24;
+var w = d * 7;
 var y = d * 365.25;
 
 /**
@@ -86758,7 +86747,7 @@ module.exports = function(val, options) {
   var type = typeof val;
   if (type === 'string' && val.length > 0) {
     return parse(val);
-  } else if (type === 'number' && isNaN(val) === false) {
+  } else if (type === 'number' && isFinite(val)) {
     return options.long ? fmtLong(val) : fmtShort(val);
   }
   throw new Error(
@@ -86780,7 +86769,7 @@ function parse(str) {
   if (str.length > 100) {
     return;
   }
-  var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(
+  var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
     str
   );
   if (!match) {
@@ -86795,6 +86784,10 @@ function parse(str) {
     case 'yr':
     case 'y':
       return n * y;
+    case 'weeks':
+    case 'week':
+    case 'w':
+      return n * w;
     case 'days':
     case 'day':
     case 'd':
@@ -86837,16 +86830,17 @@ function parse(str) {
  */
 
 function fmtShort(ms) {
-  if (ms >= d) {
+  var msAbs = Math.abs(ms);
+  if (msAbs >= d) {
     return Math.round(ms / d) + 'd';
   }
-  if (ms >= h) {
+  if (msAbs >= h) {
     return Math.round(ms / h) + 'h';
   }
-  if (ms >= m) {
+  if (msAbs >= m) {
     return Math.round(ms / m) + 'm';
   }
-  if (ms >= s) {
+  if (msAbs >= s) {
     return Math.round(ms / s) + 's';
   }
   return ms + 'ms';
@@ -86861,25 +86855,29 @@ function fmtShort(ms) {
  */
 
 function fmtLong(ms) {
-  return plural(ms, d, 'day') ||
-    plural(ms, h, 'hour') ||
-    plural(ms, m, 'minute') ||
-    plural(ms, s, 'second') ||
-    ms + ' ms';
+  var msAbs = Math.abs(ms);
+  if (msAbs >= d) {
+    return plural(ms, msAbs, d, 'day');
+  }
+  if (msAbs >= h) {
+    return plural(ms, msAbs, h, 'hour');
+  }
+  if (msAbs >= m) {
+    return plural(ms, msAbs, m, 'minute');
+  }
+  if (msAbs >= s) {
+    return plural(ms, msAbs, s, 'second');
+  }
+  return ms + ' ms';
 }
 
 /**
  * Pluralization helper.
  */
 
-function plural(ms, n, name) {
-  if (ms < n) {
-    return;
-  }
-  if (ms < n * 1.5) {
-    return Math.floor(ms / n) + ' ' + name;
-  }
-  return Math.ceil(ms / n) + ' ' + name + 's';
+function plural(ms, msAbs, n, name) {
+  var isPlural = msAbs >= n * 1.5;
+  return Math.round(ms / n) + ' ' + name + (isPlural ? 's' : '');
 }
 
 
@@ -88953,16 +88951,19 @@ function indexOf(xs, x) {
 /* 784 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
+"use strict";
+
+
 /**
- * Detect Electron renderer process, which is node, but we should
+ * Detect Electron renderer / nwjs process, which is node, but we should
  * treat as a browser.
  */
-
-if (typeof process === 'undefined' || process.type === 'renderer') {
+if (typeof process === 'undefined' || process.type === 'renderer' || process.browser === true || process.__nwjs) {
   module.exports = __webpack_require__(794);
 } else {
   module.exports = __webpack_require__(81);
 }
+
 
 
 /***/ }),
@@ -89479,41 +89480,27 @@ Object.defineProperty(exports, 'Stream', {
 /* 794 */
 /***/ (function(module, exports, __webpack_require__) {
 
+"use strict";
+
+
+function _typeof(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
+
+/* eslint-env browser */
+
 /**
  * This is the web browser implementation of `debug()`.
- *
- * Expose `debug()` as the module.
  */
-
-exports = module.exports = __webpack_require__(25);
 exports.log = log;
 exports.formatArgs = formatArgs;
 exports.save = save;
 exports.load = load;
 exports.useColors = useColors;
-exports.storage = 'undefined' != typeof chrome
-               && 'undefined' != typeof chrome.storage
-                  ? chrome.storage.local
-                  : localstorage();
-
+exports.storage = localstorage();
 /**
  * Colors.
  */
 
-exports.colors = [
-  '#0000CC', '#0000FF', '#0033CC', '#0033FF', '#0066CC', '#0066FF', '#0099CC',
-  '#0099FF', '#00CC00', '#00CC33', '#00CC66', '#00CC99', '#00CCCC', '#00CCFF',
-  '#3300CC', '#3300FF', '#3333CC', '#3333FF', '#3366CC', '#3366FF', '#3399CC',
-  '#3399FF', '#33CC00', '#33CC33', '#33CC66', '#33CC99', '#33CCCC', '#33CCFF',
-  '#6600CC', '#6600FF', '#6633CC', '#6633FF', '#66CC00', '#66CC33', '#9900CC',
-  '#9900FF', '#9933CC', '#9933FF', '#99CC00', '#99CC33', '#CC0000', '#CC0033',
-  '#CC0066', '#CC0099', '#CC00CC', '#CC00FF', '#CC3300', '#CC3333', '#CC3366',
-  '#CC3399', '#CC33CC', '#CC33FF', '#CC6600', '#CC6633', '#CC9900', '#CC9933',
-  '#CCCC00', '#CCCC33', '#FF0000', '#FF0033', '#FF0066', '#FF0099', '#FF00CC',
-  '#FF00FF', '#FF3300', '#FF3333', '#FF3366', '#FF3399', '#FF33CC', '#FF33FF',
-  '#FF6600', '#FF6633', '#FF9900', '#FF9933', '#FFCC00', '#FFCC33'
-];
-
+exports.colors = ['#0000CC', '#0000FF', '#0033CC', '#0033FF', '#0066CC', '#0066FF', '#0099CC', '#0099FF', '#00CC00', '#00CC33', '#00CC66', '#00CC99', '#00CCCC', '#00CCFF', '#3300CC', '#3300FF', '#3333CC', '#3333FF', '#3366CC', '#3366FF', '#3399CC', '#3399FF', '#33CC00', '#33CC33', '#33CC66', '#33CC99', '#33CCCC', '#33CCFF', '#6600CC', '#6600FF', '#6633CC', '#6633FF', '#66CC00', '#66CC33', '#9900CC', '#9900FF', '#9933CC', '#9933FF', '#99CC00', '#99CC33', '#CC0000', '#CC0033', '#CC0066', '#CC0099', '#CC00CC', '#CC00FF', '#CC3300', '#CC3333', '#CC3366', '#CC3399', '#CC33CC', '#CC33FF', '#CC6600', '#CC6633', '#CC9900', '#CC9933', '#CCCC00', '#CCCC33', '#FF0000', '#FF0033', '#FF0066', '#FF0099', '#FF00CC', '#FF00FF', '#FF3300', '#FF3333', '#FF3366', '#FF3399', '#FF33CC', '#FF33FF', '#FF6600', '#FF6633', '#FF9900', '#FF9933', '#FFCC00', '#FFCC33'];
 /**
  * Currently only WebKit-based Web Inspectors, Firefox >= v31,
  * and the Firebug extension (any Firefox version) are known
@@ -89521,84 +89508,65 @@ exports.colors = [
  *
  * TODO: add a `localStorage` variable to explicitly enable/disable colors
  */
+// eslint-disable-next-line complexity
 
 function useColors() {
   // NB: In an Electron preload script, document will be defined but not fully
   // initialized. Since we know we're in Chrome, we'll just detect this case
   // explicitly
-  if (typeof window !== 'undefined' && window.process && window.process.type === 'renderer') {
+  if (typeof window !== 'undefined' && window.process && (window.process.type === 'renderer' || window.process.__nwjs)) {
     return true;
-  }
+  } // Internet Explorer and Edge do not support colors.
 
-  // Internet Explorer and Edge do not support colors.
+
   if (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/(edge|trident)\/(\d+)/)) {
     return false;
-  }
-
-  // is webkit? http://stackoverflow.com/a/16459606/376773
+  } // Is webkit? http://stackoverflow.com/a/16459606/376773
   // document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
-  return (typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance) ||
-    // is firebug? http://stackoverflow.com/a/398120/376773
-    (typeof window !== 'undefined' && window.console && (window.console.firebug || (window.console.exception && window.console.table))) ||
-    // is firefox >= v31?
-    // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-    (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31) ||
-    // double check webkit in userAgent just in case we are in a worker
-    (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/));
+
+
+  return typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance || // Is firebug? http://stackoverflow.com/a/398120/376773
+  typeof window !== 'undefined' && window.console && (window.console.firebug || window.console.exception && window.console.table) || // Is firefox >= v31?
+  // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+  typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31 || // Double check webkit in userAgent just in case we are in a worker
+  typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
 }
-
-/**
- * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
- */
-
-exports.formatters.j = function(v) {
-  try {
-    return JSON.stringify(v);
-  } catch (err) {
-    return '[UnexpectedJSONParseError]: ' + err.message;
-  }
-};
-
-
 /**
  * Colorize log arguments if enabled.
  *
  * @api public
  */
 
+
 function formatArgs(args) {
-  var useColors = this.useColors;
+  args[0] = (this.useColors ? '%c' : '') + this.namespace + (this.useColors ? ' %c' : ' ') + args[0] + (this.useColors ? '%c ' : ' ') + '+' + module.exports.humanize(this.diff);
 
-  args[0] = (useColors ? '%c' : '')
-    + this.namespace
-    + (useColors ? ' %c' : ' ')
-    + args[0]
-    + (useColors ? '%c ' : ' ')
-    + '+' + exports.humanize(this.diff);
-
-  if (!useColors) return;
+  if (!this.useColors) {
+    return;
+  }
 
   var c = 'color: ' + this.color;
-  args.splice(1, 0, c, 'color: inherit')
-
-  // the final "%c" is somewhat tricky, because there could be other
+  args.splice(1, 0, c, 'color: inherit'); // The final "%c" is somewhat tricky, because there could be other
   // arguments passed either before or after the %c, so we need to
   // figure out the correct index to insert the CSS into
+
   var index = 0;
   var lastC = 0;
-  args[0].replace(/%[a-zA-Z%]/g, function(match) {
-    if ('%%' === match) return;
+  args[0].replace(/%[a-zA-Z%]/g, function (match) {
+    if (match === '%%') {
+      return;
+    }
+
     index++;
-    if ('%c' === match) {
-      // we only are interested in the *last* %c
+
+    if (match === '%c') {
+      // We only are interested in the *last* %c
       // (the user may have provided their own)
       lastC = index;
     }
   });
-
   args.splice(lastC, 0, c);
 }
-
 /**
  * Invokes `console.log()` when available.
  * No-op when `console.log` is not a "function".
@@ -89606,14 +89574,14 @@ function formatArgs(args) {
  * @api public
  */
 
-function log() {
-  // this hackery is required for IE8/9, where
-  // the `console.log` function doesn't have 'apply'
-  return 'object' === typeof console
-    && console.log
-    && Function.prototype.apply.call(console.log, console, arguments);
-}
 
+function log() {
+  var _console;
+
+  // This hackery is required for IE8/9, where
+  // the `console.log` function doesn't have 'apply'
+  return (typeof console === "undefined" ? "undefined" : _typeof(console)) === 'object' && console.log && (_console = console).log.apply(_console, arguments);
+}
 /**
  * Save `namespaces`.
  *
@@ -89621,16 +89589,18 @@ function log() {
  * @api private
  */
 
+
 function save(namespaces) {
   try {
-    if (null == namespaces) {
-      exports.storage.removeItem('debug');
+    if (namespaces) {
+      exports.storage.setItem('debug', namespaces);
     } else {
-      exports.storage.debug = namespaces;
+      exports.storage.removeItem('debug');
     }
-  } catch(e) {}
+  } catch (error) {// Swallow
+    // XXX (@Qix-) should we be logging these?
+  }
 }
-
 /**
  * Load `namespaces`.
  *
@@ -89638,26 +89608,23 @@ function save(namespaces) {
  * @api private
  */
 
+
 function load() {
   var r;
-  try {
-    r = exports.storage.debug;
-  } catch(e) {}
 
+  try {
+    r = exports.storage.getItem('debug');
+  } catch (error) {} // Swallow
+  // XXX (@Qix-) should we be logging these?
   // If debug isn't set in LS, and we're in Electron, try to load $DEBUG
+
+
   if (!r && typeof process !== 'undefined' && 'env' in process) {
     r = process.env.DEBUG;
   }
 
   return r;
 }
-
-/**
- * Enable namespaces listed in `localStorage.debug` initially.
- */
-
-exports.enable(load());
-
 /**
  * Localstorage attempts to return the localstorage.
  *
@@ -89669,11 +89636,31 @@ exports.enable(load());
  * @api private
  */
 
+
 function localstorage() {
   try {
-    return window.localStorage;
-  } catch (e) {}
+    // TVMLKit (Apple TV JS Runtime) does not have a window object, just localStorage in the global context
+    // The Browser also has localStorage in the global context.
+    return localStorage;
+  } catch (error) {// Swallow
+    // XXX (@Qix-) should we be logging these?
+  }
 }
+
+module.exports = __webpack_require__(486)(exports);
+var formatters = module.exports.formatters;
+/**
+ * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
+ */
+
+formatters.j = function (v) {
+  try {
+    return JSON.stringify(v);
+  } catch (error) {
+    return '[UnexpectedJSONParseError]: ' + error.message;
+  }
+};
+
 
 
 /***/ }),
@@ -92521,148 +92508,7 @@ module.exports = Color;
 
 
 /***/ }),
-/* 817 */
-/***/ (function(__unusedmodule, exports) {
-
-exports.get = function(belowFn) {
-  var oldLimit = Error.stackTraceLimit;
-  Error.stackTraceLimit = Infinity;
-
-  var dummyObject = {};
-
-  var v8Handler = Error.prepareStackTrace;
-  Error.prepareStackTrace = function(dummyObject, v8StackTrace) {
-    return v8StackTrace;
-  };
-  Error.captureStackTrace(dummyObject, belowFn || exports.get);
-
-  var v8StackTrace = dummyObject.stack;
-  Error.prepareStackTrace = v8Handler;
-  Error.stackTraceLimit = oldLimit;
-
-  return v8StackTrace;
-};
-
-exports.parse = function(err) {
-  if (!err.stack) {
-    return [];
-  }
-
-  var self = this;
-  var lines = err.stack.split('\n').slice(1);
-
-  return lines
-    .map(function(line) {
-      if (line.match(/^\s*[-]{4,}$/)) {
-        return self._createParsedCallSite({
-          fileName: line,
-          lineNumber: null,
-          functionName: null,
-          typeName: null,
-          methodName: null,
-          columnNumber: null,
-          'native': null,
-        });
-      }
-
-      var lineMatch = line.match(/at (?:(.+)\s+\()?(?:(.+?):(\d+)(?::(\d+))?|([^)]+))\)?/);
-      if (!lineMatch) {
-        return;
-      }
-
-      var object = null;
-      var method = null;
-      var functionName = null;
-      var typeName = null;
-      var methodName = null;
-      var isNative = (lineMatch[5] === 'native');
-
-      if (lineMatch[1]) {
-        functionName = lineMatch[1];
-        var methodStart = functionName.lastIndexOf('.');
-        if (functionName[methodStart-1] == '.')
-          methodStart--;
-        if (methodStart > 0) {
-          object = functionName.substr(0, methodStart);
-          method = functionName.substr(methodStart + 1);
-          var objectEnd = object.indexOf('.Module');
-          if (objectEnd > 0) {
-            functionName = functionName.substr(objectEnd + 1);
-            object = object.substr(0, objectEnd);
-          }
-        }
-        typeName = null;
-      }
-
-      if (method) {
-        typeName = object;
-        methodName = method;
-      }
-
-      if (method === '<anonymous>') {
-        methodName = null;
-        functionName = null;
-      }
-
-      var properties = {
-        fileName: lineMatch[2] || null,
-        lineNumber: parseInt(lineMatch[3], 10) || null,
-        functionName: functionName,
-        typeName: typeName,
-        methodName: methodName,
-        columnNumber: parseInt(lineMatch[4], 10) || null,
-        'native': isNative,
-      };
-
-      return self._createParsedCallSite(properties);
-    })
-    .filter(function(callSite) {
-      return !!callSite;
-    });
-};
-
-function CallSite(properties) {
-  for (var property in properties) {
-    this[property] = properties[property];
-  }
-}
-
-var strProperties = [
-  'this',
-  'typeName',
-  'functionName',
-  'methodName',
-  'fileName',
-  'lineNumber',
-  'columnNumber',
-  'function',
-  'evalOrigin'
-];
-var boolProperties = [
-  'topLevel',
-  'eval',
-  'native',
-  'constructor'
-];
-strProperties.forEach(function (property) {
-  CallSite.prototype[property] = null;
-  CallSite.prototype['get' + property[0].toUpperCase() + property.substr(1)] = function () {
-    return this[property];
-  }
-});
-boolProperties.forEach(function (property) {
-  CallSite.prototype[property] = false;
-  CallSite.prototype['is' + property[0].toUpperCase() + property.substr(1)] = function () {
-    return this[property];
-  }
-});
-
-exports._createParsedCallSite = function(properties) {
-  return new CallSite(properties);
-};
-
-
-/***/ }),
+/* 817 */,
 /* 818 */,
 /* 819 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -99352,7 +99198,7 @@ module.exports = require("dns");
 
 module.exports = PassThrough;
 
-var Transform = __webpack_require__(481);
+var Transform = __webpack_require__(528);
 
 __webpack_require__(689)(PassThrough, Transform);
 
@@ -101741,7 +101587,7 @@ if (process.env.READABLE_STREAM === 'disable' && Stream) {
   exports.Readable = exports;
   exports.Writable = __webpack_require__(484);
   exports.Duplex = __webpack_require__(831);
-  exports.Transform = __webpack_require__(481);
+  exports.Transform = __webpack_require__(528);
   exports.PassThrough = __webpack_require__(882);
   exports.finished = __webpack_require__(970);
   exports.pipeline = __webpack_require__(238);
@@ -109078,7 +108924,7 @@ __webpack_require__(620)(Promise, PromiseArray, apiRejection, tryConvertToPromis
 __webpack_require__(414)(Promise);
 __webpack_require__(780)(Promise, apiRejection, tryConvertToPromise, createContext, INTERNAL, debug);
 __webpack_require__(409)(Promise, INTERNAL, debug);
-__webpack_require__(528)(Promise, apiRejection, INTERNAL, tryConvertToPromise, Proxyable, debug);
+__webpack_require__(25)(Promise, apiRejection, INTERNAL, tryConvertToPromise, Proxyable, debug);
 __webpack_require__(694)(Promise);
 __webpack_require__(948)(Promise, INTERNAL);
 __webpack_require__(321)(Promise, PromiseArray, tryConvertToPromise, apiRejection);
