@@ -1,0 +1,41 @@
+{
+  "name": "webext-buildtools-firefox-addons-action",
+  "version": "1.0.0",
+  "private": false,
+  "description": "Deploy your WebExtension to Firefox Addons",
+  "main": "lib/main.js",
+  "scripts": {
+    "build": "tsc",
+    "pack": "ncc build",
+    "all": "npm run build && npm run pack"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cardinalby/webext-buildtools-firefox-addons-action.git"
+  },
+  "keywords": [
+    "webext-buildtools",
+    "webext",
+    "webextensions",
+    "webextension",
+    "firefix",
+    "addons",
+    "deployment",
+    "deploy",
+    "action"
+  ],
+  "author": "cardinalby",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.2.4",
+    "github-actions-utils": "^1.0.7",
+    "webext-buildtools-firefox-addons-builder": "^1.0.6",
+    "winston": "^3.2.1"
+  },
+  "devDependencies": {
+    "webext-buildtools-builder-types": "^1.0.8",
+    "@types/node": "^12.7.12",
+    "@zeit/ncc": "^0.20.5",
+    "typescript": "^3.6.4"
+  }
+}

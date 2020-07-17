@@ -1,0 +1,21 @@
+name: 'webext-buildtools-firefox-addons-action'
+description: 'Deploy your WebExtension to Firefox Addons'
+author: 'cardinalby'
+inputs:
+  zipFilePath:
+    description: 'Path to WebExtension directory'
+    required: true
+  extensionId:
+    description: 'Id of extension which was already uploaded to Firefox Addons'
+    required: true
+  jwtIssuer:
+    description: 'JWT issuer also called "apiKey" obtained from created credentials'
+    required: true
+  jwtSecret:
+    description: 'JWT secret also called "apiSecret" obtained from created credentials'
+    required: true
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
+branding:
+  icon: 'package'
