@@ -27,7 +27,7 @@
   "author": "cardinalby",
   "license": "MIT",
   "dependencies": {
-    "@actions/core": "^1.2.4",
+    "@actions/core": "^1.2.6",
     "github-actions-utils": "^1.0.7",
     "webext-buildtools-firefox-addons-builder": "^1.0.8",
     "winston": "^3.2.1"
