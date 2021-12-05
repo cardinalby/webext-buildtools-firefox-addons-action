@@ -9,6 +9,8 @@ package.
 
 * `zipFilePath` **Required**<br>
 Path to packed extension (relative to repository)
+You can use [webext-buildtools-pack-extension-dir-action](https://github.com/cardinalby/webext-buildtools-pack-extension-dir-action)
+to pack your extension directory and provide this input from it's output
 
 * `extensionId` **Required**<br>
 Your extension id at Firefox Addons
@@ -20,7 +22,7 @@ Your extension id at Firefox Addons
     * `jwtSecret` **Required**<br>
     JWT secret also called "apiSecret" obtained from created credentials. Use secrets!
 
-## Simple usage example
+## Usage example
 
 ```yaml
 uses: cardinalby/webext-buildtools-firefox-addons-action@v1
@@ -30,3 +32,7 @@ with:
   jwtIssuer: ${{ secrets.FF_JWT_ISSUER }}
   jwtSecret: ${{ secrets.FF_JWT_SECRET }}
 ```
+
+---
+If you are interested in the building the entire deployment workflow for WebExtension, 
+you can read this [article](https://dev.to/cardinalby/webextension-deployment-and-publishing-using-github-actions-522o).
