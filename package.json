@@ -29,7 +29,7 @@
   "dependencies": {
     "@actions/core": "^1.6.0",
     "github-actions-utils": "^1.0.8",
-    "webext-buildtools-firefox-addons-builder": "^1.0.9",
+    "webext-buildtools-firefox-addons-builder": "^1.0.10",
     "winston": "^3.2.1"
   },
   "devDependencies": {

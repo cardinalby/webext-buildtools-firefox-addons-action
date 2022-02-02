@@ -42433,9 +42433,7 @@ function escapeJsonPtr(str) {
 /**
  * JSONSchema Validator - Validates JavaScript objects using JSON Schemas
  *	(http://www.json.com/json-schema-proposal/)
- *
- * Copyright (c) 2007 Kris Zyp SitePen (www.sitepen.com)
- * Licensed under the MIT (MIT-LICENSE.txt) license.
+ * Licensed under AFL-2.1 OR BSD-3-Clause
 To use the validator call the validate function with an instance object and an optional schema object.
 If a schema is provided, it will be used to validate. If the instance object refers to a schema (self-validating),
 that schema will be used to validate and the schema parameter is not necessary (if both exist,
@@ -42539,7 +42537,7 @@ var validate = exports._validate = function(/*Any*/instance,/*Object*/schema,/*O
 						!(value instanceof Array && type == 'array') &&
 						!(value instanceof Date && type == 'date') &&
 						!(type == 'integer' && value%1===0)){
-					return [{property:path,message:(typeof value) + " value found, but a " + type + " is required"}];
+					return [{property:path,message:value + " - " + (typeof value) + " value found, but a " + type + " is required"}];
 				}
 				if(type instanceof Array){
 					var unionErrors=[];
@@ -42602,11 +42600,11 @@ var validate = exports._validate = function(/*Any*/instance,/*Object*/schema,/*O
 				if(schema.minLength && typeof value == 'string' && value.length < schema.minLength){
 					addError("must be at least " + schema.minLength + " characters long");
 				}
-				if(typeof schema.minimum !== undefined && typeof value == typeof schema.minimum &&
+				if(typeof schema.minimum !== 'undefined' && typeof value == typeof schema.minimum &&
 						schema.minimum > value){
 					addError("must have a minimum value of " + schema.minimum);
 				}
-				if(typeof schema.maximum !== undefined && typeof value == typeof schema.maximum &&
+				if(typeof schema.maximum !== 'undefined' && typeof value == typeof schema.maximum &&
 						schema.maximum < value){
 					addError("must have a maximum value of " + schema.maximum);
 				}
@@ -42641,8 +42639,8 @@ var validate = exports._validate = function(/*Any*/instance,/*Object*/schema,/*O
 			}
 			
 			for(var i in objTypeDef){ 
-				if(objTypeDef.hasOwnProperty(i)){
-					var value = instance[i];
+				if(objTypeDef.hasOwnProperty(i) && i != '__proto__' && i != 'constructor'){
+					var value = instance.hasOwnProperty(i) ? instance[i] : undefined;
 					// skip _not_ specified properties
 					if (value === undefined && options.existingOnly) continue;
 					var propDef = objTypeDef[i];
@@ -42663,7 +42661,7 @@ var validate = exports._validate = function(/*Any*/instance,/*Object*/schema,/*O
 					delete instance[i];
 					continue;
 				} else {
-					errors.push({property:path,message:(typeof value) + "The property " + i +
+					errors.push({property:path,message:"The property " + i +
 						" is not defined in the schema and the schema does not allow additional properties"});
 				}
 			}
@@ -105136,7 +105134,6 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const builder_1 = __nccwpck_require__(43975);
 exports["default"] = builder_1.FirefoxAddonsBuilder;
-__exportStar(__nccwpck_require__(10686), exports);
 __exportStar(__nccwpck_require__(77435), exports);
 //# sourceMappingURL=index.js.map
 
@@ -112819,14 +112816,6 @@ function wrappy (fn, cb) {
     return ret
   }
 }
-
-
-/***/ }),
-
-/***/ 10686:
-/***/ ((module) => {
-
-module.exports = eval("require")("../declarations/options");
 
 
 /***/ }),
