@@ -41595,8 +41595,10 @@ function patch (fs) {
     return function (target, options) {
       var stats = options ? orig.call(fs, target, options)
         : orig.call(fs, target)
-      if (stats.uid < 0) stats.uid += 0x100000000
-      if (stats.gid < 0) stats.gid += 0x100000000
+      if (stats) {
+        if (stats.uid < 0) stats.uid += 0x100000000
+        if (stats.gid < 0) stats.gid += 0x100000000
+      }
       return stats;
     }
   }
@@ -110507,7 +110509,7 @@ async function deployAddon(options) {
             '/versions/' +
             encodeURIComponent(options.version) + '/')
             .set('Authorization', `JWT ${token}`)
-            .attach('upload', options.src)).body.pk;
+            .field('upload', options.src)).body.pk;
     }
     catch (err) {
         switch (err.response.status) {
@@ -110613,6 +110615,7 @@ const sign_addon_1 = __nccwpck_require__(84033);
 const webext_buildtools_utils_1 = __nccwpck_require__(90696);
 const buildResult_1 = __nccwpck_require__(77435);
 const deployAddon_1 = __nccwpck_require__(23807);
+const SameVersionAlreadyUploadedError_1 = __nccwpck_require__(45864);
 // noinspection JSUnusedGlobalSymbols
 /**
  * ISimpleBuilder wrapper around sign-addon package
@@ -110715,7 +110718,7 @@ class FirefoxAddonsBuilder extends webext_buildtools_utils_1.AbstractSimpleBuild
                 }
                 this._logWrapper.info(`Signing '${inputZipFile}'...`);
                 const signResult = await sign_addon_1.signAddon(signAddonOptions);
-                this.validateSignResult(signResult);
+                this.validateSignResult(signResult, this._options.signXpi.extensionId || '');
                 result.getAssets().signedExtStoreId = new buildResult_1.FirefoxAddonsExtIdAsset(signResult.id);
                 const srcXpiFile = signResult.downloadedFiles[0];
                 if (this._outSignedXpiBufferRequired) {
@@ -110758,9 +110761,13 @@ class FirefoxAddonsBuilder extends webext_buildtools_utils_1.AbstractSimpleBuild
             throw Error('Inputs validation error: ' + errors.join(', '));
         }
     }
-    validateSignResult(signResult) {
+    validateSignResult(signResult, version) {
+        var _a;
         if (!signResult.success) {
             this._logWrapper.error('Signing error', signResult);
+            if (signResult.errorCode === 'SERVER_FAILURE' && ((_a = signResult.errorDetails) === null || _a === void 0 ? void 0 : _a.includes('Version already exists'))) {
+                throw new SameVersionAlreadyUploadedError_1.SameVersionAlreadyUploadedError(version, signResult.errorDetails);
+            }
             throw new Error('Signing error');
         }
         if (signResult.downloadedFiles.length === 0) {

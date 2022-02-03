@@ -1,6 +1,5 @@
 {
   "name": "webext-buildtools-firefox-addons-action",
-  "version": "1.0.3",
   "private": false,
   "description": "Deploy your WebExtension to Firefox Addons",
   "main": "lib/main.js",
@@ -29,13 +28,13 @@
   "dependencies": {
     "@actions/core": "^1.6.0",
     "github-actions-utils": "^1.0.8",
-    "webext-buildtools-firefox-addons-builder": "^1.0.12",
+    "webext-buildtools-firefox-addons-builder": "^1.0.13",
     "winston": "^3.2.1"
   },
   "devDependencies": {
-    "webext-buildtools-builder-types": "^1.0.10",
     "@types/node": "^12.7.12",
     "@vercel/ncc": "^0.33.1",
-    "typescript": "^3.9.10"
+    "typescript": "^3.9.10",
+    "webext-buildtools-builder-types": "^1.0.10"
   }
 }
