@@ -5,22 +5,34 @@
 Based on [FirefoxAddonsBuilder](https://www.npmjs.com/package/webext-buildtools-firefox-addons-builder) 
 package.
 
+## API access
+
+To setup API access you need to generate `jwtIssuer` and `jwtSecret`
+([https://addons.mozilla.org/en-US/developers/addon/api/key/](https://addons.mozilla.org/en-US/developers/addon/api/key/)):
+
 ## Inputs
 
-* `zipFilePath` **Required**<br>
+### 🔸 `zipFilePath` _Required_
 Path to packed extension (relative to repository)
 You can use [webext-buildtools-pack-extension-dir-action](https://github.com/cardinalby/webext-buildtools-pack-extension-dir-action)
 to pack your extension directory and provide this input from it's output
 
-* `extensionId` **Required**<br>
+### 🔸 `extensionId` _Required_
 Your extension id at Firefox Addons
 
-* To setup API access you need to generate `jwtIssuer` and `jwtSecret` 
-([https://addons.mozilla.org/en-US/developers/addon/api/key/](https://addons.mozilla.org/en-US/developers/addon/api/key/)):
-    * `jwtIssuer` **Required**<br>
-    JWT issuer also called "apiKey" obtained from created credentials. Use secrets!
-    * `jwtSecret` **Required**<br>
-    JWT secret also called "apiSecret" obtained from created credentials. Use secrets!
+### 🔸 `jwtIssuer` _Required_
+JWT issuer also called "apiKey" obtained from created credentials. Use secrets!
+
+### 🔸 `jwtSecret` _Required_
+JWT secret also called "apiSecret" obtained from created credentials. Use secrets!
+
+## Outputs
+
+### 🔹 `sameVersionAlreadyUploadedError`
+`true` if the action failed because the version you try to upload already exists.
+
+### 🔹 `validationError`
+`true` if the action failed because validation at Add-ons side rejected your extension.
 
 ## Usage example
 

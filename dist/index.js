@@ -19,6 +19,45 @@ exports.actionInputs = {
 
 /***/ }),
 
+/***/ 74633:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.actionOutputs = void 0;
+const ghActions = __importStar(__nccwpck_require__(42186));
+exports.actionOutputs = {
+    setSameVersionAlreadyUploadedError: () => {
+        ghActions.setOutput('sameVersionAlreadyUploadedError', 'true');
+    },
+    setValidationError: () => {
+        ghActions.setOutput('validationError', 'true');
+    }
+};
+
+
+/***/ }),
+
 /***/ 65228:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -81,10 +120,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const ghActions = __importStar(__nccwpck_require__(42186));
-const webext_buildtools_firefox_addons_builder_1 = __importDefault(__nccwpck_require__(13905));
+const webext_buildtools_firefox_addons_builder_1 = __importStar(__nccwpck_require__(13905));
 const actionInputs_1 = __nccwpck_require__(48366);
 const logger_1 = __nccwpck_require__(65228);
 const fs_1 = __importDefault(__nccwpck_require__(57147));
+const actionOutputs_1 = __nccwpck_require__(74633);
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -92,6 +132,12 @@ function run() {
         }
         catch (error) {
             ghActions.setFailed(error.message);
+            if (error instanceof webext_buildtools_firefox_addons_builder_1.ValidationError) {
+                actionOutputs_1.actionOutputs.setValidationError();
+            }
+            else if (error instanceof webext_buildtools_firefox_addons_builder_1.SameVersionAlreadyUploadedError) {
+                actionOutputs_1.actionOutputs.setSameVersionAlreadyUploadedError();
+            }
         }
     });
 }

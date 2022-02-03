@@ -14,6 +14,11 @@ inputs:
   jwtSecret:
     description: 'JWT secret also called "apiSecret" obtained from created credentials'
     required: true
+outputs:
+  sameVersionAlreadyUploadedError:
+    description: "true if failed because the version was already uploaded"
+  validationError:
+    description: "true if failed because Add-ons validation rejected the extension"
 runs:
   using: 'node16'
   main: 'dist/index.js'
