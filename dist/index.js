@@ -110509,7 +110509,8 @@ async function deployAddon(options) {
             '/versions/' +
             encodeURIComponent(options.version) + '/')
             .set('Authorization', `JWT ${token}`)
-            .field('upload', options.src)).body.pk;
+            .set('Content-Type', 'multipart/form-data')
+            .attach('upload', options.src, { filename: 'extension.zip', contentType: 'application/zip' })).body.pk;
     }
     catch (err) {
         switch (err.response.status) {
