@@ -8,6 +8,7 @@ import {actionInputs} from './actionInputs';
 import {getLogger} from './logger';
 import fs from "fs";
 import {actionOutputs} from "./actionOutputs";
+import {PollTimedOutError} from "webext-buildtools-firefox-addons-builder/dist/errors/PollTimedOutError";
 
 async function run(): Promise<void> {
     try {
@@ -15,9 +16,11 @@ async function run(): Promise<void> {
     } catch (error) {
         ghActions.setFailed(error.message);
         if (error instanceof ValidationError) {
-            actionOutputs.setValidationError();
+            actionOutputs.validationError.setValue(true);
         } else if (error instanceof SameVersionAlreadyUploadedError) {
-            actionOutputs.setSameVersionAlreadyUploadedError();
+            actionOutputs.sameVersionAlreadyUploadedError.setValue(true);
+        } else if (error instanceof PollTimedOutError) {
+            actionOutputs.timeoutError.setValue(true);
         }
     }
 }
@@ -41,7 +44,8 @@ function getBuilderOptions(): IFirefoxAddonsOptions {
             jwtIssuer: actionInputs.jwtIssuer
         },
         deploy: {
-            extensionId: actionInputs.extensionId
+            extensionId: actionInputs.extensionId,
+            pollTimeoutMs: actionInputs.timeoutMs
         }
     };
 }

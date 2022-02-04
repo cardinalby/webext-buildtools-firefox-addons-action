@@ -26,6 +26,10 @@ JWT issuer also called "apiKey" obtained from created credentials. Use secrets!
 ### 🔸 `jwtSecret` _Required_
 JWT secret also called "apiSecret" obtained from created credentials. Use secrets!
 
+### 🔸 `timeoutMs` _Optional, default: `600000` (10 min)_
+Timeout in milliseconds of waiting of uploaded extension processing by Addons server.
+In case of timeout, action fails with `timeoutError` output equal `true`.
+
 ## Outputs
 
 ### 🔹 `sameVersionAlreadyUploadedError`
@@ -33,6 +37,9 @@ JWT secret also called "apiSecret" obtained from created credentials. Use secret
 
 ### 🔹 `validationError`
 `true` if the action failed because validation at Add-ons side rejected your extension.
+
+### 🔹 `timeoutError`
+`true` if failed because polling timed out according to timeoutMs input.
 
 ## Usage example
 

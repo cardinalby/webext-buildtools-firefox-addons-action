@@ -13,46 +13,26 @@ exports.actionInputs = {
     zipFilePath: github_actions_utils_1.actionInputs.getWsPath('zipFilePath', true),
     extensionId: github_actions_utils_1.actionInputs.getString('extensionId', true, false),
     jwtIssuer: github_actions_utils_1.actionInputs.getString('jwtIssuer', true, true),
-    jwtSecret: github_actions_utils_1.actionInputs.getString('jwtSecret', true, true)
+    jwtSecret: github_actions_utils_1.actionInputs.getString('jwtSecret', true, true),
+    timeoutMs: github_actions_utils_1.actionInputs.getInt('timeoutMs', true),
 };
 
 
 /***/ }),
 
 /***/ 74633:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.actionOutputs = void 0;
-const ghActions = __importStar(__nccwpck_require__(42186));
+const github_actions_utils_1 = __nccwpck_require__(18267);
+const transformBool = (v) => v ? 'true' : 'false';
 exports.actionOutputs = {
-    setSameVersionAlreadyUploadedError: () => {
-        ghActions.setOutput('sameVersionAlreadyUploadedError', 'true');
-    },
-    setValidationError: () => {
-        ghActions.setOutput('validationError', 'true');
-    }
+    sameVersionAlreadyUploadedError: new github_actions_utils_1.ActionTrOutput('sameVersionAlreadyUploadedError', transformBool),
+    validationError: new github_actions_utils_1.ActionTrOutput('validationError', transformBool),
+    timeoutError: new github_actions_utils_1.ActionTrOutput('timeoutError', transformBool),
 };
 
 
@@ -125,6 +105,7 @@ const actionInputs_1 = __nccwpck_require__(48366);
 const logger_1 = __nccwpck_require__(65228);
 const fs_1 = __importDefault(__nccwpck_require__(57147));
 const actionOutputs_1 = __nccwpck_require__(74633);
+const PollTimedOutError_1 = __nccwpck_require__(749);
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -133,10 +114,13 @@ function run() {
         catch (error) {
             ghActions.setFailed(error.message);
             if (error instanceof webext_buildtools_firefox_addons_builder_1.ValidationError) {
-                actionOutputs_1.actionOutputs.setValidationError();
+                actionOutputs_1.actionOutputs.validationError.setValue(true);
             }
             else if (error instanceof webext_buildtools_firefox_addons_builder_1.SameVersionAlreadyUploadedError) {
-                actionOutputs_1.actionOutputs.setSameVersionAlreadyUploadedError();
+                actionOutputs_1.actionOutputs.sameVersionAlreadyUploadedError.setValue(true);
+            }
+            else if (error instanceof PollTimedOutError_1.PollTimedOutError) {
+                actionOutputs_1.actionOutputs.timeoutError.setValue(true);
             }
         }
     });
@@ -158,7 +142,8 @@ function getBuilderOptions() {
             jwtIssuer: actionInputs_1.actionInputs.jwtIssuer
         },
         deploy: {
-            extensionId: actionInputs_1.actionInputs.extensionId
+            extensionId: actionInputs_1.actionInputs.extensionId,
+            pollTimeoutMs: actionInputs_1.actionInputs.timeoutMs
         }
     };
 }
@@ -110484,6 +110469,32 @@ WError.prototype.cause = function we_cause(c)
 
 /***/ }),
 
+/***/ 82273:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Duration = void 0;
+class Duration {
+    constructor(startTick) {
+        this.startTick = startTick;
+    }
+    static startMeasuring() {
+        return new Duration(process.hrtime.bigint());
+    }
+    measure() {
+        return process.hrtime.bigint() - this.startTick;
+    }
+    measureMs() {
+        return Number(this.measure() / BigInt(1000000));
+    }
+}
+exports.Duration = Duration;
+//# sourceMappingURL=Duration.js.map
+
+/***/ }),
+
 /***/ 23807:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -110496,6 +110507,8 @@ const prepareJwt_1 = __nccwpck_require__(44562);
 const UnauthorizedError_1 = __nccwpck_require__(73543);
 const SameVersionAlreadyUploadedError_1 = __nccwpck_require__(45864);
 const ValidationError_1 = __nccwpck_require__(30675);
+const Duration_1 = __nccwpck_require__(82273);
+const PollTimedOutError_1 = __nccwpck_require__(749);
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -110522,10 +110535,17 @@ async function deployAddon(options) {
                 throw new Error('Submission failed: Status ' + err.response.status + ': ' + err.response.body.error);
         }
     }
+    const duration = Duration_1.Duration.startMeasuring();
     while (true) {
         let response;
+        const timeLeft = options.pollTimeoutMs
+            ? options.pollTimeoutMs - duration.measureMs()
+            : undefined;
+        if (timeLeft !== undefined && timeLeft <= 0) {
+            throw new PollTimedOutError_1.PollTimedOutError(uploadId, 'Polling timed out');
+        }
         try {
-            response = (await request
+            const req = request
                 .get('https://addons.mozilla.org/api/v5/addons/' +
                 encodeURIComponent(options.id) +
                 '/versions/' +
@@ -110533,7 +110553,11 @@ async function deployAddon(options) {
                 '/uploads/' +
                 encodeURIComponent(uploadId) +
                 '/')
-                .set('Authorization', `JWT ${token}`)).body;
+                .set('Authorization', `JWT ${token}`);
+            if (timeLeft !== undefined) {
+                req.timeout(timeLeft);
+            }
+            response = (await req).body;
         }
         catch (err) {
             if (err.response.status === 401) {
@@ -110541,11 +110565,11 @@ async function deployAddon(options) {
             }
             throw new Error('Polling failed: Status ' + err.response.status + ': ' + err.response.body.error);
         }
-        if (!response.valid) {
-            throw new ValidationError_1.ValidationError('Validation failed: ' + response.validation_url + ' ' +
-                JSON.stringify(response.validation_results));
-        }
         if (response.processed) {
+            if (!response.valid) {
+                throw new ValidationError_1.ValidationError('Validation failed: ' + response.validation_url + ' ' +
+                    JSON.stringify(response.validation_results));
+            }
             return response;
         }
         await sleep(15000);
@@ -110800,6 +110824,24 @@ FirefoxAddonsBuilder.TARGET_NAME = 'firefox-addons-deploy';
 
 /***/ }),
 
+/***/ 749:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.PollTimedOutError = void 0;
+class PollTimedOutError extends Error {
+    constructor(pk, message) {
+        super(message);
+        this.pk = pk;
+    }
+}
+exports.PollTimedOutError = PollTimedOutError;
+//# sourceMappingURL=PollTimedOutError.js.map
+
+/***/ }),
+
 /***/ 45864:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -110872,6 +110914,8 @@ var ValidationError_1 = __nccwpck_require__(30675);
 Object.defineProperty(exports, "ValidationError", ({ enumerable: true, get: function () { return ValidationError_1.ValidationError; } }));
 var SameVersionAlreadyUploadedError_1 = __nccwpck_require__(45864);
 Object.defineProperty(exports, "SameVersionAlreadyUploadedError", ({ enumerable: true, get: function () { return SameVersionAlreadyUploadedError_1.SameVersionAlreadyUploadedError; } }));
+var PollTimedOutError_1 = __nccwpck_require__(749);
+Object.defineProperty(exports, "PollTimedOutError", ({ enumerable: true, get: function () { return PollTimedOutError_1.PollTimedOutError; } }));
 //# sourceMappingURL=index.js.map
 
 /***/ }),

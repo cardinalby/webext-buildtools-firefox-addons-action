@@ -14,11 +14,17 @@ inputs:
   jwtSecret:
     description: 'JWT secret also called "apiSecret" obtained from created credentials'
     required: true
+  timeoutMs:
+    description: 'Timeout in milliseconds of waiting of uploaded extension processing by Addons server'
+    required: false
+    default: '600000' # 10 min
 outputs:
   sameVersionAlreadyUploadedError:
     description: "true if failed because the version was already uploaded"
   validationError:
     description: "true if failed because Add-ons validation rejected the extension"
+  timeoutError:
+    description: "true if failed because polling timed out according to timeoutMs input"
 runs:
   using: 'node16'
   main: 'dist/index.js'

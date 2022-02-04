@@ -1,11 +1,9 @@
-import * as ghActions from '@actions/core';
+import { ActionTrOutput } from 'github-actions-utils';
+
+const transformBool = (v: boolean) => v ? 'true' : 'false';
 
 export const actionOutputs = {
-    setSameVersionAlreadyUploadedError: () => {
-        ghActions.setOutput('sameVersionAlreadyUploadedError', 'true');
-    },
-
-    setValidationError: () => {
-        ghActions.setOutput('validationError', 'true');
-    }
+    sameVersionAlreadyUploadedError: new ActionTrOutput<boolean>('sameVersionAlreadyUploadedError', transformBool),
+    validationError: new ActionTrOutput<boolean>('validationError', transformBool),
+    timeoutError: new ActionTrOutput<boolean>('timeoutError', transformBool),
 }
