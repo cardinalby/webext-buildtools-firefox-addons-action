@@ -1,4 +1,4 @@
-name: 'webext-buildtools-firefox-addons-action'
+name: 'Publish an extension on Firefox Addons Store'
 description: 'Deploy your WebExtension to Firefox Addons'
 author: 'cardinalby'
 inputs:

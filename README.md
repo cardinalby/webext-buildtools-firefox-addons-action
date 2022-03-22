@@ -54,4 +54,4 @@ with:
 
 ---
 If you are interested in the building the entire deployment workflow for WebExtension, 
-you can read this [article](https://dev.to/cardinalby/webextension-deployment-and-publishing-using-github-actions-522o).
+you can read this [article](https://cardinalby.github.io/blog/post/github-actions/webext/1-introduction/).
