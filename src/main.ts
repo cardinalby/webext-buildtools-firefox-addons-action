@@ -14,7 +14,7 @@ async function run(): Promise<void> {
     try {
         await runImpl();
     } catch (error) {
-        ghActions.setFailed(error.message);
+        ghActions.setFailed(String(error));
         if (error instanceof ValidationError) {
             actionOutputs.validationError.setValue(true);
         } else if (error instanceof SameVersionAlreadyUploadedError) {
@@ -32,6 +32,9 @@ async function runImpl() {
     const builder = new FirefoxAddonsBuilder(options, logger);
 
     builder.setInputBuffer(fs.readFileSync(actionInputs.zipFilePath));
+    if (actionInputs.sourcesZipFilePath) {
+        builder.setInputSourcesZipBuffer(fs.readFileSync(actionInputs.sourcesZipFilePath));
+    }
     builder.requireDeployedExt();
 
     return builder.build();

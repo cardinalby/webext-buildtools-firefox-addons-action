@@ -3,8 +3,11 @@ description: 'Deploy your WebExtension to Firefox Addons'
 author: 'cardinalby'
 inputs:
   zipFilePath:
-    description: 'Path to WebExtension directory'
+    description: 'Path to zip with packed WebExtension directory'
     required: true
+  sourcesZipFilePath:
+    description: 'Path to zip with sources of the addon'
+    required: false
   extensionId:
     description: 'Id of extension which was already uploaded to Firefox Addons'
     required: true

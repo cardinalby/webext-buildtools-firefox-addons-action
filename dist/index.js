@@ -11,6 +11,7 @@ exports.actionInputs = void 0;
 const github_actions_utils_1 = __nccwpck_require__(18267);
 exports.actionInputs = {
     zipFilePath: github_actions_utils_1.actionInputs.getWsPath('zipFilePath', true),
+    sourcesZipFilePath: github_actions_utils_1.actionInputs.getWsPath('sourcesZipFilePath', false),
     extensionId: github_actions_utils_1.actionInputs.getString('extensionId', true, false),
     jwtIssuer: github_actions_utils_1.actionInputs.getString('jwtIssuer', true, true),
     jwtSecret: github_actions_utils_1.actionInputs.getString('jwtSecret', true, true),
@@ -69,7 +70,11 @@ exports.getLogger = getLogger;
 
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -82,7 +87,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -112,7 +117,7 @@ function run() {
             yield runImpl();
         }
         catch (error) {
-            ghActions.setFailed(error.message);
+            ghActions.setFailed(String(error));
             if (error instanceof webext_buildtools_firefox_addons_builder_1.ValidationError) {
                 actionOutputs_1.actionOutputs.validationError.setValue(true);
             }
@@ -127,10 +132,13 @@ function run() {
 }
 function runImpl() {
     return __awaiter(this, void 0, void 0, function* () {
-        const logger = logger_1.getLogger();
+        const logger = (0, logger_1.getLogger)();
         const options = getBuilderOptions();
         const builder = new webext_buildtools_firefox_addons_builder_1.default(options, logger);
         builder.setInputBuffer(fs_1.default.readFileSync(actionInputs_1.actionInputs.zipFilePath));
+        if (actionInputs_1.actionInputs.sourcesZipFilePath) {
+            builder.setInputSourcesZipBuffer(fs_1.default.readFileSync(actionInputs_1.actionInputs.sourcesZipFilePath));
+        }
         builder.requireDeployedExt();
         return builder.build();
     });
@@ -110517,14 +110525,19 @@ async function deployAddon(options, logger) {
     const token = prepareJwt_1.prepareJwt(options.issuer, options.secret);
     try {
         logger.info(`Uploading version ${options.version}...`);
-        uploadId = (await request
-            .put('https://addons.mozilla.org/api/v5/addons/' +
+        const requestObj = request
+            .post('https://addons.mozilla.org/api/v5/addons/' +
             encodeURIComponent(options.id) +
             '/versions/' +
             encodeURIComponent(options.version) + '/')
             .set('Authorization', `JWT ${token}`)
             .set('Content-Type', 'multipart/form-data')
-            .attach('upload', options.src, { filename: 'extension.zip', contentType: 'application/zip' })).body.pk;
+            .attach('upload', options.addonZip, { filename: 'extension.zip', contentType: 'application/zip' });
+        if (options.addonSourcesZip) {
+            requestObj
+                .attach('source', options.addonSourcesZip, { filename: 'sources.zip', contentType: 'application/zip' });
+        }
+        uploadId = (await requestObj).body.pk;
     }
     catch (err) {
         switch (err.response.status) {
@@ -110668,6 +110681,11 @@ class FirefoxAddonsBuilder extends webext_buildtools_utils_1.AbstractSimpleBuild
         this._inputZipBuffer = buffer;
         return this;
     }
+    // noinspection JSUnusedGlobalSymbols
+    setInputSourcesZipBuffer(buffer) {
+        this._inputSourcesZipBuffer = buffer;
+        return this;
+    }
     setInputManifest(manifest) {
         if (!manifest.name || !manifest.version) {
             throw Error('Invalid manifest object, id and name fields are required');
@@ -110721,7 +110739,8 @@ class FirefoxAddonsBuilder extends webext_buildtools_utils_1.AbstractSimpleBuild
                 version: manifest.version,
                 issuer: this._options.api.jwtIssuer,
                 secret: this._options.api.jwtSecret,
-                src: this._inputZipBuffer
+                addonZip: this._inputZipBuffer,
+                addonSourcesZip: this._inputSourcesZipBuffer
             }, this._logWrapper);
             result.getAssets().deployedExtStoreId = new buildResult_1.FirefoxAddonsExtIdAsset(manifest.version);
         }
@@ -110789,7 +110808,7 @@ class FirefoxAddonsBuilder extends webext_buildtools_utils_1.AbstractSimpleBuild
     validateInputs() {
         const errors = [];
         if (!this._inputZipBuffer) {
-            errors.push("zip buffer path isn't specified");
+            errors.push("zip buffer isn't specified");
         }
         if (errors.length > 0) {
             throw Error('Inputs validation error: ' + errors.join(', '));
