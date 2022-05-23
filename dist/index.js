@@ -9,33 +9,73 @@
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.actionInputs = void 0;
 const github_actions_utils_1 = __nccwpck_require__(18267);
+function getChannel() {
+    const value = github_actions_utils_1.actionInputs.getString('channel', true);
+    if (value === 'listed' || value === 'unlisted') {
+        return value;
+    }
+    throw new Error(`Invalid "channel" input value: ${value}. Should be "listed" or "unlisted"`);
+}
 exports.actionInputs = {
-    zipFilePath: github_actions_utils_1.actionInputs.getWsPath('zipFilePath', true),
-    sourcesZipFilePath: github_actions_utils_1.actionInputs.getWsPath('sourcesZipFilePath', false),
+    zipFilePath: github_actions_utils_1.actionInputs.getString('zipFilePath', true),
+    sourcesZipFilePath: github_actions_utils_1.actionInputs.getString('sourcesZipFilePath', false),
     extensionId: github_actions_utils_1.actionInputs.getString('extensionId', true, false),
+    channel: getChannel(),
     jwtIssuer: github_actions_utils_1.actionInputs.getString('jwtIssuer', true, true),
     jwtSecret: github_actions_utils_1.actionInputs.getString('jwtSecret', true, true),
     timeoutMs: github_actions_utils_1.actionInputs.getInt('timeoutMs', true),
 };
-
+//# sourceMappingURL=actionInputs.js.map
 
 /***/ }),
 
 /***/ 74633:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.actionOutputs = void 0;
-const github_actions_utils_1 = __nccwpck_require__(18267);
+const core = __importStar(__nccwpck_require__(42186));
 const transformBool = (v) => v ? 'true' : 'false';
 exports.actionOutputs = {
-    sameVersionAlreadyUploadedError: new github_actions_utils_1.ActionTrOutput('sameVersionAlreadyUploadedError', transformBool),
-    validationError: new github_actions_utils_1.ActionTrOutput('validationError', transformBool),
-    timeoutError: new github_actions_utils_1.ActionTrOutput('timeoutError', transformBool),
+    setSameVersionAlreadyUploadedError(value) {
+        core.setOutput('sameVersionAlreadyUploadedError', transformBool(value));
+    },
+    setValidationError(value) {
+        core.setOutput('validationError', transformBool(value));
+    },
+    setUnauthorizedError(value) {
+        core.setOutput('unauthorizedError', transformBool(value));
+    },
+    setTimeoutError(value) {
+        core.setOutput('timeoutError', transformBool(value));
+    },
 };
-
+//# sourceMappingURL=actionOutputs.js.map
 
 /***/ }),
 
@@ -59,7 +99,7 @@ function getLogger() {
     return logger.log.bind(logger);
 }
 exports.getLogger = getLogger;
-
+//# sourceMappingURL=logger.js.map
 
 /***/ }),
 
@@ -100,15 +140,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const ghActions = __importStar(__nccwpck_require__(42186));
 const webext_buildtools_firefox_addons_builder_1 = __importStar(__nccwpck_require__(13905));
 const actionInputs_1 = __nccwpck_require__(48366);
 const logger_1 = __nccwpck_require__(65228);
-const fs_1 = __importDefault(__nccwpck_require__(57147));
 const actionOutputs_1 = __nccwpck_require__(74633);
 const PollTimedOutError_1 = __nccwpck_require__(749);
 function run() {
@@ -119,13 +155,16 @@ function run() {
         catch (error) {
             ghActions.setFailed(String(error));
             if (error instanceof webext_buildtools_firefox_addons_builder_1.ValidationError) {
-                actionOutputs_1.actionOutputs.validationError.setValue(true);
+                actionOutputs_1.actionOutputs.setValidationError(true);
             }
-            else if (error instanceof webext_buildtools_firefox_addons_builder_1.SameVersionAlreadyUploadedError) {
-                actionOutputs_1.actionOutputs.sameVersionAlreadyUploadedError.setValue(true);
+            else if (error instanceof webext_buildtools_firefox_addons_builder_1.VersionAlreadyExistsError) {
+                actionOutputs_1.actionOutputs.setSameVersionAlreadyUploadedError(true);
             }
             else if (error instanceof PollTimedOutError_1.PollTimedOutError) {
-                actionOutputs_1.actionOutputs.timeoutError.setValue(true);
+                actionOutputs_1.actionOutputs.setTimeoutError(true);
+            }
+            else if (error instanceof webext_buildtools_firefox_addons_builder_1.UnauthorizedError) {
+                actionOutputs_1.actionOutputs.setUnauthorizedError(true);
             }
         }
     });
@@ -135,9 +174,9 @@ function runImpl() {
         const logger = (0, logger_1.getLogger)();
         const options = getBuilderOptions();
         const builder = new webext_buildtools_firefox_addons_builder_1.default(options, logger);
-        builder.setInputBuffer(fs_1.default.readFileSync(actionInputs_1.actionInputs.zipFilePath));
+        builder.setInputZipFilePath(actionInputs_1.actionInputs.zipFilePath);
         if (actionInputs_1.actionInputs.sourcesZipFilePath) {
-            builder.setInputSourcesZipBuffer(fs_1.default.readFileSync(actionInputs_1.actionInputs.sourcesZipFilePath));
+            builder.setInputSourcesZipFilePath(actionInputs_1.actionInputs.sourcesZipFilePath);
         }
         builder.requireDeployedExt();
         return builder.build();
@@ -151,13 +190,14 @@ function getBuilderOptions() {
         },
         deploy: {
             extensionId: actionInputs_1.actionInputs.extensionId,
+            channel: actionInputs_1.actionInputs.channel,
             pollTimeoutMs: actionInputs_1.actionInputs.timeoutMs
         }
     };
 }
 // noinspection JSIgnoredPromiseFromCall
 run();
-
+//# sourceMappingURL=main.js.map
 
 /***/ }),
 
