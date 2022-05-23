@@ -1,12 +1,11 @@
 import * as ghActions from '@actions/core';
 import FirefoxAddonsBuilder, {
     IFirefoxAddonsOptions,
-    SameVersionAlreadyUploadedError,
-    ValidationError
+    VersionAlreadyExistsError,
+    ValidationError, UnauthorizedError
 } from 'webext-buildtools-firefox-addons-builder';
 import {actionInputs} from './actionInputs';
 import {getLogger} from './logger';
-import fs from "fs";
 import {actionOutputs} from "./actionOutputs";
 import {PollTimedOutError} from "webext-buildtools-firefox-addons-builder/dist/errors/PollTimedOutError";
 
@@ -16,11 +15,13 @@ async function run(): Promise<void> {
     } catch (error) {
         ghActions.setFailed(String(error));
         if (error instanceof ValidationError) {
-            actionOutputs.validationError.setValue(true);
-        } else if (error instanceof SameVersionAlreadyUploadedError) {
-            actionOutputs.sameVersionAlreadyUploadedError.setValue(true);
+            actionOutputs.setValidationError(true);
+        } else if (error instanceof VersionAlreadyExistsError) {
+            actionOutputs.setSameVersionAlreadyUploadedError(true);
         } else if (error instanceof PollTimedOutError) {
-            actionOutputs.timeoutError.setValue(true);
+            actionOutputs.setTimeoutError(true);
+        } else if (error instanceof UnauthorizedError) {
+            actionOutputs.setUnauthorizedError(true);
         }
     }
 }
@@ -31,9 +32,9 @@ async function runImpl() {
     const options = getBuilderOptions();
     const builder = new FirefoxAddonsBuilder(options, logger);
 
-    builder.setInputBuffer(fs.readFileSync(actionInputs.zipFilePath));
+    builder.setInputZipFilePath(actionInputs.zipFilePath);
     if (actionInputs.sourcesZipFilePath) {
-        builder.setInputSourcesZipBuffer(fs.readFileSync(actionInputs.sourcesZipFilePath));
+        builder.setInputSourcesZipFilePath(actionInputs.sourcesZipFilePath);
     }
     builder.requireDeployedExt();
 
@@ -48,6 +49,7 @@ function getBuilderOptions(): IFirefoxAddonsOptions {
         },
         deploy: {
             extensionId: actionInputs.extensionId,
+            channel: actionInputs.channel,
             pollTimeoutMs: actionInputs.timeoutMs
         }
     };

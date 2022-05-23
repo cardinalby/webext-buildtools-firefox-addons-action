@@ -1,9 +1,21 @@
-import { ActionTrOutput } from 'github-actions-utils';
+import * as core from '@actions/core';
 
 const transformBool = (v: boolean) => v ? 'true' : 'false';
 
 export const actionOutputs = {
-    sameVersionAlreadyUploadedError: new ActionTrOutput<boolean>('sameVersionAlreadyUploadedError', transformBool),
-    validationError: new ActionTrOutput<boolean>('validationError', transformBool),
-    timeoutError: new ActionTrOutput<boolean>('timeoutError', transformBool),
+    setSameVersionAlreadyUploadedError(value: boolean) {
+        core.setOutput('sameVersionAlreadyUploadedError', transformBool(value));
+    },
+
+    setValidationError(value: boolean) {
+        core.setOutput('validationError', transformBool(value));
+    },
+
+    setUnauthorizedError(value: boolean) {
+        core.setOutput('unauthorizedError', transformBool(value));
+    },
+
+    setTimeoutError(value: boolean) {
+        core.setOutput('timeoutError', transformBool(value));
+    },
 }

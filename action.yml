@@ -11,6 +11,10 @@ inputs:
   extensionId:
     description: 'Id of extension which was already uploaded to Firefox Addons'
     required: true
+  channel:
+    description: 'The version channel, which determines its visibility on the site. Can be either "unlisted" or "listed"'
+    required: false
+    default: 'listed'
   jwtIssuer:
     description: 'JWT issuer also called "apiKey" obtained from created credentials'
     required: true
@@ -26,6 +30,8 @@ outputs:
     description: "true if failed because the version was already uploaded"
   validationError:
     description: "true if failed because Add-ons validation rejected the extension"
+  unauthorizedError:
+    description: "true if failed because of 401 Unauthorized response from API"
   timeoutError:
     description: "true if failed because polling timed out according to timeoutMs input"
 runs:

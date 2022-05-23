@@ -1,0 +1,22 @@
+name: npm-publish
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+jobs:
+  test:
+    name: npm-publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@master
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 16.x
+      - run: npm install
+      - run: npm test
+        env:
+          EXTENSION_ID: ${{secrets.EXTENSION_ID}}
+          JWT_ISSUER: ${{secrets.JWT_ISSUER}}
+          JWT_SECRET: ${{secrets.JWT_SECRET}}
