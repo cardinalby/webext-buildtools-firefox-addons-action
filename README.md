@@ -1,4 +1,5 @@
-![Node.js CI](https://github.com/cardinalby/webext-buildtools-firefox-addons-action/workflows/build-test/badge.svg)
+![pack](https://github.com/cardinalby/webext-buildtools-firefox-addons-action/workflows/build-test/badge.svg)
+[![test](https://github.com/cardinalby/webext-buildtools-firefox-addons-action/actions/workflows/test.yml/badge.svg)](https://github.com/cardinalby/webext-buildtools-firefox-addons-action/actions/workflows/test.yml)
 
 # Deploy your WebExtension to Firefox Addons
 
