@@ -6,7 +6,6 @@ on:
   pull_request:
 jobs:
   test:
-    name: npm-publish
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
