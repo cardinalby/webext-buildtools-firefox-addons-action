@@ -7,7 +7,8 @@
     "build": "tsc",
     "test": "jest",
     "pack": "ncc build",
-    "all": "npm run build && npm run pack"
+    "all": "npm run build && npm run pack",
+    "mergePushMasterToV1": "git fetch . master:v1 && git push origin v1"
   },
   "repository": {
     "type": "git",
