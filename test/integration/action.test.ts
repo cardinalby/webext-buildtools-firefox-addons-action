@@ -3,7 +3,7 @@ import * as fs from "fs";
 import {PathLike} from "fs";
 import { zip } from 'zip-a-folder';
 import * as dotenv from 'dotenv';
-import {RunOptions, RunTarget} from "github-action-ts-run-api";
+import {deleteAllFakedDirs, RunOptions, RunTarget} from "github-action-ts-run-api";
 
 dotenv.config({path: 'tests.env'});
 
@@ -26,6 +26,7 @@ describe('webext-buildtools-firefox-addons-action', () => {
 
     afterAll(() => {
         rm(zipFilePath);
+        deleteAllFakedDirs()
     });
 
     it('should try to deploy', async () => {
@@ -48,6 +49,7 @@ describe('webext-buildtools-firefox-addons-action', () => {
         expect(result.commands.outputs.validationError).toBeUndefined();
         expect(result.commands.outputs.unauthorizedError).toBeUndefined();
         expect(result.commands.outputs.timeoutError).toBeUndefined();
+        expect(result.warnings).toHaveLength(0);
     });
 
     it('should fail due to invalid jwt', async () => {
@@ -70,5 +72,6 @@ describe('webext-buildtools-firefox-addons-action', () => {
         expect(result.commands.outputs.validationError).toBeUndefined();
         expect(result.commands.outputs.unauthorizedError).toEqual('true');
         expect(result.commands.outputs.timeoutError).toBeUndefined();
+        expect(result.warnings).toHaveLength(0);
     });
 });
