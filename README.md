@@ -3,13 +3,29 @@
 
 # Deploy your WebExtension to Firefox Addons
 
-Based on [FirefoxAddonsBuilder](https://www.npmjs.com/package/webext-buildtools-firefox-addons-builder) 
-package.
+Based on [FirefoxAddonsBuilder](https://github.com/cardinalby/webext-buildtools-firefox-addons-builder) 
+package. 
+
+The action is intended to **update existing** published Addon and can't create a new one.
 
 ## API access
 
 To setup API access you need to generate `jwtIssuer` and `jwtSecret`
 ([https://addons.mozilla.org/en-US/developers/addon/api/key/](https://addons.mozilla.org/en-US/developers/addon/api/key/)):
+
+## Example
+
+```yaml
+uses: cardinalby/webext-buildtools-firefox-addons-action@v1
+with:
+  zipFilePath: 'build/extension.zip'
+  extensionId: '{7b312f5e-9680-436b-acc1-9b09f60e8aaa}'
+  jwtIssuer: ${{ secrets.FF_JWT_ISSUER }}
+  jwtSecret: ${{ secrets.FF_JWT_SECRET }}
+```
+
+If you are interested in the building the entire deployment workflow for WebExtension,
+you can read this [article](https://cardinalby.github.io/blog/post/github-actions/webext/1-introduction/).
 
 ## Inputs
 
@@ -56,17 +72,8 @@ In case of timeout, action fails with `timeoutError` output equal `true`.
 ### 🔻 `timeoutError`
 `true` if failed because polling timed out according to timeoutMs input.
 
-## Usage example
-
-```yaml
-uses: cardinalby/webext-buildtools-firefox-addons-action@v1
-with:
-  zipFilePath: 'build/extension.zip'
-  extensionId: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-  jwtIssuer: ${{ secrets.FF_JWT_ISSUER }}
-  jwtSecret: ${{ secrets.FF_JWT_SECRET }}
-```
-
----
-If you are interested in the building the entire deployment workflow for WebExtension, 
-you can read this [article](https://cardinalby.github.io/blog/post/github-actions/webext/1-introduction/).
+## Key features
+- Uses Addons API v5.
+- Allows uploading sources for review.
+- Has detailed error outputs.
+- Extracts manifest from zip archive automatically
