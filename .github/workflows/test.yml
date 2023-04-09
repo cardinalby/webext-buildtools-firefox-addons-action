@@ -10,15 +10,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@master
-      - uses: actions/setup-node@v1
+      - uses: actions/setup-node@v3
         with:
-          node-version: 16.x
+          node-version: 18
       - name: Add mask
         run: |
           echo "::add-mask::${{ secrets.EXTENSION_ID }}" &&
           echo "::add-mask::${{ secrets.JWT_ISSUER }}" &&
           echo "::add-mask::${{ secrets.JWT_SECRET }}"
-      - run: npm install
+      - run: npm ci
+      - run: npm run build
       - run: npm test
         env:
           EXTENSION_ID: ${{secrets.EXTENSION_ID}}

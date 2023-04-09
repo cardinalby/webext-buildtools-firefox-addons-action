@@ -10,28 +10,25 @@ jobs:
     env:
       PACKED_JS_PATH: 'dist/index.js'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [16.x]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Extract branch name
         id: extractBranch
         shell: bash
-        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+        run: echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
+      - name: Use Node.js 16
+        uses: actions/setup-node@v3
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 16
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Build
         run: npm run build
       - name: Pack
         run: npm run pack
       - name: Check packed js changes
         id: packedJsStatus
-        run: echo ::set-output name=changes::$(git status ${{ env.PACKED_JS_PATH }} --porcelain)
+        run: echo "changes=$(git status ${{ env.PACKED_JS_PATH }} --porcelain)" >> $GITHUB_OUTPUT
       - name: Commit packed js
         id: commitPackedJs
         if: steps.packedJsStatus.outputs.changes
