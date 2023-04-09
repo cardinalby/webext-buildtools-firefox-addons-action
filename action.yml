@@ -2,9 +2,12 @@ name: 'Publish an extension on Firefox Addons Store'
 description: 'Deploy your WebExtension to Firefox Addons'
 author: 'cardinalby'
 inputs:
+  uploadId:
+    description: 'Id of already existing upload'
+    required: false
   zipFilePath:
     description: 'Path to zip with packed WebExtension directory'
-    required: true
+    required: false
   sourcesZipFilePath:
     description: 'Path to zip with sources of the addon'
     required: false
@@ -26,6 +29,10 @@ inputs:
     required: false
     default: '600000' # 10 min
 outputs:
+  errorUploadId:
+    description: "id of upload"
+  errorExtensionVersion:
+    description: "extension version"
   sameVersionAlreadyUploadedError:
     description: "true if failed because the version was already uploaded"
   validationError:
@@ -34,6 +41,8 @@ outputs:
     description: "true if failed because of 401 Unauthorized response from API"
   timeoutError:
     description: "true if failed because polling timed out according to timeoutMs input"
+  requestThrottledError:
+    description: "true if failed because request to Add-ons API has been throttled by the server"
 runs:
   using: 'node16'
   main: 'dist/index.js'

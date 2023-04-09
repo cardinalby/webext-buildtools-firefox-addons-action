@@ -10,11 +10,18 @@ function getChannel(): UploadChannel {
 }
 
 export const actionInputs = {
-    zipFilePath: inputs.getString('zipFilePath', true),
+    zipFilePath: inputs.getString('zipFilePath', false),
+    uploadId: inputs.getString('uploadId', false),
     sourcesZipFilePath: inputs.getString('sourcesZipFilePath', false),
     extensionId: inputs.getString('extensionId', true, false),
     channel: getChannel(),
     jwtIssuer: inputs.getString('jwtIssuer', true, true),
     jwtSecret: inputs.getString('jwtSecret', true, true),
     timeoutMs: inputs.getInt('timeoutMs', true),
+}
+
+if ((!actionInputs.zipFilePath && !actionInputs.uploadId) ||
+    (actionInputs.zipFilePath && actionInputs.uploadId)
+) {
+    throw new Error('Either zipFilePath or uploadId input should be set')
 }

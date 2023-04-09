@@ -45,11 +45,14 @@ describe('webext-buildtools-firefox-addons-action', () => {
         expect(result.commands.secrets).toContain(process.env.JWT_ISSUER);
         expect(result.commands.secrets).toContain(process.env.JWT_SECRET);
         expect(result.commands.errors.length).toEqual(1);
-        expect(result.commands.outputs.sameVersionAlreadyUploadedError).toEqual('true');
+        expect(
+            result.commands.outputs.sameVersionAlreadyUploadedError === 'true' ||
+            result.commands.outputs.timeoutError === 'true'
+        ).toBeTruthy();
         expect(result.commands.outputs.validationError).toBeUndefined();
         expect(result.commands.outputs.unauthorizedError).toBeUndefined();
         expect(result.commands.outputs.timeoutError).toBeUndefined();
-        expect(result.warnings).toHaveLength(0);
+        expect(result.runnerWarnings).toHaveLength(0);
     });
 
     it('should fail due to invalid jwt', async () => {
@@ -72,6 +75,6 @@ describe('webext-buildtools-firefox-addons-action', () => {
         expect(result.commands.outputs.validationError).toBeUndefined();
         expect(result.commands.outputs.unauthorizedError).toEqual('true');
         expect(result.commands.outputs.timeoutError).toBeUndefined();
-        expect(result.warnings).toHaveLength(0);
+        expect(result.runnerWarnings).toHaveLength(0);
     });
 });

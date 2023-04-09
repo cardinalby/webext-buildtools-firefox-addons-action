@@ -2,7 +2,7 @@ import * as ghActions from '@actions/core';
 import FirefoxAddonsBuilder, {
     IFirefoxAddonsOptions,
     VersionAlreadyExistsError,
-    ValidationError, UnauthorizedError
+    ValidationError, UnauthorizedError, RequestThrottled, AddonsApiError
 } from 'webext-buildtools-firefox-addons-builder';
 import {actionInputs} from './actionInputs';
 import {getLogger} from './logger';
@@ -14,6 +14,16 @@ async function run(): Promise<void> {
         await runImpl();
     } catch (error) {
         ghActions.setFailed(String(error));
+
+        if (error instanceof AddonsApiError) {
+            if (error.uploadId !== undefined) {
+                actionOutputs.setErrorUploadId(error.uploadId)
+            }
+            if (error.version !== undefined) {
+                actionOutputs.setErrorExtensionVersion(error.version)
+            }
+        }
+
         if (error instanceof ValidationError) {
             actionOutputs.setValidationError(true);
         } else if (error instanceof VersionAlreadyExistsError) {
@@ -22,6 +32,8 @@ async function run(): Promise<void> {
             actionOutputs.setTimeoutError(true);
         } else if (error instanceof UnauthorizedError) {
             actionOutputs.setUnauthorizedError(true);
+        } else if (error instanceof RequestThrottled) {
+            actionOutputs.setRequestThrottledError(true);
         }
     }
 }
@@ -32,7 +44,11 @@ async function runImpl() {
     const options = getBuilderOptions();
     const builder = new FirefoxAddonsBuilder(options, logger);
 
-    builder.setInputZipFilePath(actionInputs.zipFilePath);
+    if (actionInputs.zipFilePath) {
+        builder.setInputZipFilePath(actionInputs.zipFilePath);
+    } else if (actionInputs.uploadId) {
+        builder.setInputUploadId(actionInputs.uploadId)
+    }
     if (actionInputs.sourcesZipFilePath) {
         builder.setInputSourcesZipFilePath(actionInputs.sourcesZipFilePath);
     }
