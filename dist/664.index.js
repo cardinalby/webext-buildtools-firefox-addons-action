@@ -23923,13 +23923,17 @@ function readPkcs8EdDSAPrivate(der) {
 	var k = der.readString(asn1.Ber.OctetString, true);
 	k = utils.zeroPadToLength(k, 32);
 
-	var A;
-	if (der.peek() === asn1.Ber.BitString) {
-		A = utils.readBitString(der);
-		A = utils.zeroPadToLength(A, 32);
-	} else {
-		A = utils.calculateED25519Public(k);
+	var A, tag;
+	while ((tag = der.peek()) !== null) {
+		if (tag === (asn1.Ber.Context | 1)) {
+			A = utils.readBitString(der, tag);
+		} else {
+			der.readSequence(tag);
+			der._offset += der.length;
+		}
 	}
+	if (A === undefined)
+		A = utils.calculateED25519Public(k);
 
 	var key = {
 		type: 'ed25519',
@@ -23973,8 +23977,11 @@ function writePkcs8(der, key) {
 	der.startSequence();
 
 	if (PrivateKey.isPrivateKey(key)) {
-		var sillyInt = Buffer.from([0]);
-		der.writeBuffer(sillyInt, asn1.Ber.Integer);
+		var version = 0;
+		if (key.type === 'ed25519')
+			version = 1;
+		var vbuf = Buffer.from([version]);
+		der.writeBuffer(vbuf, asn1.Ber.Integer);
 	}
 
 	der.startSequence();
@@ -24003,9 +24010,9 @@ function writePkcs8(der, key) {
 	case 'ed25519':
 		der.writeOID('1.3.101.112');
 		if (PrivateKey.isPrivateKey(key))
-			throw (new Error('Ed25519 private keys in pkcs8 ' +
-			    'format are not supported'));
-		writePkcs8EdDSAPublic(key, der);
+			writePkcs8EdDSAPrivate(key, der);
+		else
+			writePkcs8EdDSAPublic(key, der);
 		break;
 	default:
 		throw (new Error('Unsupported key type: ' + key.type));
@@ -24162,10 +24169,15 @@ function writePkcs8EdDSAPublic(key, der) {
 function writePkcs8EdDSAPrivate(key, der) {
 	der.endSequence();
 
-	var k = utils.mpNormalize(key.part.k.data, true);
 	der.startSequence(asn1.Ber.OctetString);
+	var k = utils.mpNormalize(key.part.k.data);
+	/* RFCs call for storing exactly 32 bytes, so strip any leading zeros */
+	while (k.length > 32 && k[0] === 0x00)
+		k = k.slice(1);
 	der.writeBuffer(k, asn1.Ber.OctetString);
 	der.endSequence();
+
+	utils.writeBitString(der, key.part.A.data, asn1.Ber.Context | 1);
 }
 
 
@@ -35259,7 +35271,7 @@ class Client {
       /** @type {NodeJS.Timer} */
       const abortTimeout = _setAbortTimeout(() => {
         var _this$_progressBar;
-        (_this$_progressBar = this._progressBar) === null || _this$_progressBar === void 0 ? void 0 : _this$_progressBar.finish();
+        (_this$_progressBar = this._progressBar) === null || _this$_progressBar === void 0 || _this$_progressBar.finish();
         _clearTimeout(statusCheckTimeout);
         reject(new Error(lib/* oneLine */.f9`Signing is still pending, you will receive an email
             once there is an update on the status of your submission. If you
@@ -35288,7 +35300,7 @@ class Client {
           const requiresManualReview = status.valid && !canBeAutoSigned;
           if (signedAndReady || requiresManualReview) {
             var _this$_progressBar2;
-            (_this$_progressBar2 = this._progressBar) === null || _this$_progressBar2 === void 0 ? void 0 : _this$_progressBar2.finish();
+            (_this$_progressBar2 = this._progressBar) === null || _this$_progressBar2 === void 0 || _this$_progressBar2.finish();
             _clearTimeout(abortTimeout);
             if (requiresManualReview) {
               this.logger.log(lib/* oneLine */.f9`Your add-on has been submitted for review.
@@ -35334,11 +35346,11 @@ class Client {
           });
           if (status.processed) {
             var _this$_progressBar3, _this$_progressBar4, _this$_progressBar5;
-            (_this$_progressBar3 = this._progressBar) === null || _this$_progressBar3 === void 0 ? void 0 : _this$_progressBar3.finish();
+            (_this$_progressBar3 = this._progressBar) === null || _this$_progressBar3 === void 0 || _this$_progressBar3.finish();
             this.logger.log('Validation results:', status.validation_url);
             // Update pseudo progress preamble for the signing step.
-            (_this$_progressBar4 = this._progressBar) === null || _this$_progressBar4 === void 0 ? void 0 : _this$_progressBar4.setPreamble('Signing add-on');
-            (_this$_progressBar5 = this._progressBar) === null || _this$_progressBar5 === void 0 ? void 0 : _this$_progressBar5.animate();
+            (_this$_progressBar4 = this._progressBar) === null || _this$_progressBar4 === void 0 || _this$_progressBar4.setPreamble('Signing add-on');
+            (_this$_progressBar5 = this._progressBar) === null || _this$_progressBar5 === void 0 || _this$_progressBar5.animate();
             if (status.valid) {
               checkSignedStatus();
             } else {
@@ -35363,7 +35375,7 @@ class Client {
       };
 
       // Goooo
-      (_this$_progressBar6 = this._progressBar) === null || _this$_progressBar6 === void 0 ? void 0 : _this$_progressBar6.animate();
+      (_this$_progressBar6 = this._progressBar) === null || _this$_progressBar6 === void 0 || _this$_progressBar6.animate();
       checkValidationStatus();
     });
   }
